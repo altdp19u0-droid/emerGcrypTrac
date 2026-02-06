@@ -2248,10 +2248,15 @@ const PositionsPage = () => {
   const api = createAuthenticatedApi(accessToken);
   const [positions, setPositions] = useState([]);
   const [totalsByAsset, setTotalsByAsset] = useState({});
+  const [globalTotals, setGlobalTotals] = useState({});
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [editingPosition, setEditingPosition] = useState(null);
+  const [movementDialogOpen, setMovementDialogOpen] = useState(false);
+  const [selectedPositionForMovement, setSelectedPositionForMovement] = useState(null);
+  const [movementsDialogOpen, setMovementsDialogOpen] = useState(false);
+  const [selectedPositionMovements, setSelectedPositionMovements] = useState([]);
   const [newPosition, setNewPosition] = useState({
     platform: "",
     product_type: "savings",
@@ -2260,6 +2265,14 @@ const PositionsPage = () => {
     apy: 0,
     deposit_date: new Date().toISOString().split("T")[0],
     unlock_date: "",
+    notes: ""
+  });
+  const [newMovement, setNewMovement] = useState({
+    movement_type: "yield_realized",
+    amount: 0,
+    asset: "",
+    date: new Date().toISOString().split("T")[0],
+    tx_hash: "",
     notes: ""
   });
 
@@ -2274,6 +2287,11 @@ const PositionsPage = () => {
     { value: "liquidity", label: "Liquidity Pool" },
     { value: "other", label: "Autre" }
   ];
+  const movementTypes = [
+    { value: "yield_realized", label: "Rendement Réalisé", color: "text-green-400" },
+    { value: "capital_withdrawal", label: "Retrait de Capital", color: "text-blue-400" },
+    { value: "impermanent_loss", label: "Perte (Rupture Contrat)", color: "text-red-400" }
+  ];
   const assets = ["EURA", "EURC", "ZCHF", "USDC", "USDT", "ETH", "BTC", "EUR", "USD", "CHF"];
 
   const fetchPositions = async () => {
@@ -2281,6 +2299,7 @@ const PositionsPage = () => {
       const response = await api.get("/positions");
       setPositions(response.data.positions || []);
       setTotalsByAsset(response.data.totals_by_asset || {});
+      setGlobalTotals(response.data.global_totals || {});
     } catch (error) {
       toast.error("Erreur lors du chargement des positions");
     } finally {
@@ -2316,6 +2335,80 @@ const PositionsPage = () => {
     } catch (error) {
       toast.error("Erreur lors de la création");
     }
+  };
+
+  // Ouvrir le dialog pour ajouter un mouvement
+  const openMovementDialog = (pos) => {
+    setSelectedPositionForMovement(pos);
+    setNewMovement({
+      movement_type: "yield_realized",
+      amount: 0,
+      asset: pos.asset,
+      date: new Date().toISOString().split("T")[0],
+      tx_hash: "",
+      notes: ""
+    });
+    setMovementDialogOpen(true);
+  };
+
+  // Créer un mouvement
+  const handleCreateMovement = async () => {
+    if (!selectedPositionForMovement || !newMovement.amount) {
+      toast.error("Montant requis");
+      return;
+    }
+    try {
+      await api.post("/position-movements", {
+        position_id: selectedPositionForMovement.id,
+        ...newMovement
+      });
+      toast.success("Mouvement enregistré");
+      setMovementDialogOpen(false);
+      setSelectedPositionForMovement(null);
+      fetchPositions();
+    } catch (error) {
+      toast.error("Erreur lors de la création du mouvement");
+    }
+  };
+
+  // Voir les mouvements d'une position
+  const viewMovements = async (pos) => {
+    try {
+      const response = await api.get(`/position-movements/${pos.id}`);
+      setSelectedPositionMovements(response.data.movements || []);
+      setSelectedPositionForMovement(pos);
+      setMovementsDialogOpen(true);
+    } catch (error) {
+      toast.error("Erreur lors du chargement des mouvements");
+    }
+  };
+
+  // Supprimer un mouvement
+  const handleDeleteMovement = async (movementId) => {
+    if (window.confirm("Supprimer ce mouvement ?")) {
+      try {
+        await api.delete(`/position-movements/${movementId}`);
+        toast.success("Mouvement supprimé");
+        // Refresh movements list
+        if (selectedPositionForMovement) {
+          const response = await api.get(`/position-movements/${selectedPositionForMovement.id}`);
+          setSelectedPositionMovements(response.data.movements || []);
+        }
+        fetchPositions();
+      } catch (error) {
+        toast.error("Erreur lors de la suppression");
+      }
+    }
+  };
+
+  const getMovementTypeLabel = (value) => {
+    const mt = movementTypes.find(m => m.value === value);
+    return mt ? mt.label : value;
+  };
+
+  const getMovementTypeColor = (value) => {
+    const mt = movementTypes.find(m => m.value === value);
+    return mt ? mt.color : "text-gray-400";
   };
 
   const openEditDialog = (pos) => {
