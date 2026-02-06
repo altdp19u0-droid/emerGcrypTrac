@@ -1138,6 +1138,8 @@ const TransactionsPage = () => {
   const [addressClassifications, setAddressClassifications] = useState({});
   const [dialogOpen, setDialogOpen] = useState(false);
   const [csvDialogOpen, setCsvDialogOpen] = useState(false);
+  const [editCryptoDialogOpen, setEditCryptoDialogOpen] = useState(false);
+  const [editingCryptoTx, setEditingCryptoTx] = useState(null);
   const [csvData, setCsvData] = useState("");
   const [selectedWalletForImport, setSelectedWalletForImport] = useState("");
   const [newTransaction, setNewTransaction] = useState({
