@@ -1959,6 +1959,20 @@ const TransactionsPage = () => {
                   <TableCell>{new Date(tx.date).toLocaleDateString("fr-FR")}</TableCell>
                   <TableCell>
                     <div className="flex gap-1">
+                      {/* Edit button - only for manual crypto transactions */}
+                      {isTransactionEditable(tx) && (
+                        <Button 
+                          variant="ghost" 
+                          size="icon" 
+                          className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                          onClick={() => openEditCryptoDialog(tx)}
+                          title="Modifier"
+                          data-testid={`edit-crypto-tx-${tx.id}`}
+                        >
+                          <Edit2 size={16} />
+                        </Button>
+                      )}
+                      {/* Spam toggle - only for crypto */}
                       {tx.tx_category !== "fiat" && (
                         <Button 
                           variant="ghost" 
@@ -1970,25 +1984,14 @@ const TransactionsPage = () => {
                           {tx.is_spam ? <Check size={16} /> : <Ban size={16} />}
                         </Button>
                       )}
+                      {/* Delete button */}
                       <Button 
                         variant="ghost" 
                         size="icon" 
-                        className="text-red-500 hover:text-red-600"
-                        onClick={async () => {
-                          try {
-                            if (tx.tx_category === "fiat") {
-                              // Delete fiat transaction would need a different endpoint
-                              toast.error("Supprimez les transactions fiat depuis la page Fiat");
-                            } else {
-                              await api.delete(`/transactions/${tx.id}`);
-                              toast.success("Transaction supprimée");
-                              fetchTransactions();
-                            }
-                          } catch (error) {
-                            toast.error("Erreur lors de la suppression");
-                          }
-                        }}
+                        className="text-red-500 hover:text-red-600 hover:bg-red-500/10"
+                        onClick={() => handleDeleteCryptoTransaction(tx.id, tx.tx_category)}
                         title="Supprimer"
+                        data-testid={`delete-crypto-tx-${tx.id}`}
                       >
                         <Trash2 size={16} />
                       </Button>
@@ -1999,6 +2002,120 @@ const TransactionsPage = () => {
             </TableBody>
           </Table>
         </ScrollArea>
+        
+        {/* Dialog d'édition pour transactions crypto */}
+        <Dialog open={editCryptoDialogOpen} onOpenChange={setEditCryptoDialogOpen}>
+          <DialogContent className="max-w-lg">
+            <DialogHeader><DialogTitle>Modifier la Transaction Crypto</DialogTitle></DialogHeader>
+            {editingCryptoTx && (
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Type</Label>
+                    <Select value={editingCryptoTx.type} onValueChange={(v) => setEditingCryptoTx({...editingCryptoTx, type: v})}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Buy">Buy</SelectItem>
+                        <SelectItem value="Sell">Sell</SelectItem>
+                        <SelectItem value="Transfer In">Transfer In</SelectItem>
+                        <SelectItem value="Transfer Out">Transfer Out</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Asset</Label>
+                    <Select value={editingCryptoTx.asset} onValueChange={(v) => setEditingCryptoTx({...editingCryptoTx, asset: v})}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {availableAssets.map(asset => (
+                          <SelectItem key={asset} value={asset}>{asset}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Montant</Label>
+                    <Input 
+                      type="number"
+                      step="0.0001"
+                      value={editingCryptoTx.amount}
+                      onChange={(e) => setEditingCryptoTx({...editingCryptoTx, amount: parseFloat(e.target.value) || 0})}
+                      data-testid="edit-crypto-amount-input"
+                    />
+                  </div>
+                  <div>
+                    <Label>Prix EUR</Label>
+                    <Input 
+                      type="number"
+                      step="0.0001"
+                      value={editingCryptoTx.price_eur}
+                      onChange={(e) => setEditingCryptoTx({...editingCryptoTx, price_eur: parseFloat(e.target.value) || 0})}
+                      data-testid="edit-crypto-price-eur-input"
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Prix USD</Label>
+                    <Input 
+                      type="number"
+                      step="0.0001"
+                      value={editingCryptoTx.price_usd}
+                      onChange={(e) => setEditingCryptoTx({...editingCryptoTx, price_usd: parseFloat(e.target.value) || 0})}
+                    />
+                  </div>
+                  <div>
+                    <Label>Frais ({editingCryptoTx.fees_currency})</Label>
+                    <Input 
+                      type="number"
+                      step="0.01"
+                      value={editingCryptoTx.fees}
+                      onChange={(e) => setEditingCryptoTx({...editingCryptoTx, fees: parseFloat(e.target.value) || 0})}
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <Label>Date</Label>
+                    <Input 
+                      type="date"
+                      value={editingCryptoTx.date}
+                      onChange={(e) => setEditingCryptoTx({...editingCryptoTx, date: e.target.value})}
+                      data-testid="edit-crypto-date-input"
+                    />
+                  </div>
+                  <div>
+                    <Label>Heure</Label>
+                    <Input 
+                      type="time"
+                      value={editingCryptoTx.time}
+                      onChange={(e) => setEditingCryptoTx({...editingCryptoTx, time: e.target.value})}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label>Contrepartie (adresse)</Label>
+                  <Input 
+                    value={editingCryptoTx.counterparty_wallet || ""}
+                    onChange={(e) => setEditingCryptoTx({...editingCryptoTx, counterparty_wallet: e.target.value})}
+                    placeholder="0x..."
+                  />
+                </div>
+                
+                <div className="flex gap-2">
+                  <Button variant="outline" onClick={() => setEditCryptoDialogOpen(false)} className="flex-1">Annuler</Button>
+                  <Button onClick={handleUpdateCryptoTransaction} className="flex-1" data-testid="submit-edit-crypto-tx-btn">Enregistrer</Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
         
         <div className="pagination-row">
           <Button variant="secondary" size="sm" disabled={pagination.page === 1} onClick={() => setPagination({...pagination, page: pagination.page - 1})}>
