@@ -345,6 +345,21 @@ class FiatTransaction(BaseModel):
     # Running balance (calculé)
     running_balance: Optional[float] = None
 
+class FiatTransactionUpdate(BaseModel):
+    """Model for updating an existing fiat transaction"""
+    type: Optional[str] = None
+    amount: Optional[float] = None
+    description: Optional[str] = None
+    date: Optional[str] = None
+    source_type: Optional[str] = None
+    source_account_id: Optional[str] = None
+    source_wallet_id: Optional[str] = None
+    source_wallet_address: Optional[str] = None
+    dest_type: Optional[str] = None
+    dest_account_id: Optional[str] = None
+    dest_wallet_id: Optional[str] = None
+    dest_wallet_address: Optional[str] = None
+
 class CSVImportRequest(BaseModel):
     wallet_id: str
     csv_data: str
