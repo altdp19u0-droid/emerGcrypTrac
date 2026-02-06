@@ -2672,13 +2672,37 @@ const PositionsPage = () => {
                         <Badge variant="outline">{getProductTypeLabel(pos.product_type)}</Badge>
                       </TableCell>
                       <TableCell className="font-mono">{pos.asset}</TableCell>
-                      <TableCell className="text-right font-mono">{pos.amount?.toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-mono">
+                        <div>{pos.amount?.toFixed(2)}</div>
+                        {pos.capital_withdrawn > 0 && (
+                          <div className="text-xs text-amber-400">-{pos.capital_withdrawn.toFixed(2)} retiré</div>
+                        )}
+                        {pos.total_loss > 0 && (
+                          <div className="text-xs text-red-400">-{pos.total_loss.toFixed(2)} perte</div>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">{pos.apy}%</TableCell>
                       <TableCell className="text-right text-green-400 font-mono">
-                        +{pos.estimated_earnings?.toFixed(2)}
+                        +{(pos.realized_yield || 0).toFixed(2)}
+                        {pos.movements_count > 0 && (
+                          <div className="text-xs text-muted-foreground">({pos.movements_count} mvts)</div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right font-mono text-muted-foreground">
+                        +{(pos.pending_yield || 0).toFixed(2)}
                       </TableCell>
                       <TableCell>
-                        {pos.is_locked ? (
+                        {pos.status === "loss" ? (
+                          <div className="flex items-center gap-1 text-red-400">
+                            <AlertTriangle size={14} />
+                            <span className="text-xs">Perte</span>
+                          </div>
+                        ) : pos.status === "closed" ? (
+                          <div className="flex items-center gap-1 text-zinc-400">
+                            <Check size={14} />
+                            <span className="text-xs">Clôturé</span>
+                          </div>
+                        ) : pos.is_locked ? (
                           <div className="flex items-center gap-1 text-amber-400">
                             <Lock size={14} />
                             <span className="text-xs">{pos.days_until_unlock}j</span>
@@ -2686,12 +2710,30 @@ const PositionsPage = () => {
                         ) : (
                           <div className="flex items-center gap-1 text-green-400">
                             <Check size={14} />
-                            <span className="text-xs">Liquide</span>
+                            <span className="text-xs">Actif</span>
                           </div>
                         )}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-green-400 hover:text-green-300"
+                            onClick={() => openMovementDialog(pos)}
+                            title="Ajouter Mouvement"
+                          >
+                            <Plus size={14} />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-purple-400 hover:text-purple-300"
+                            onClick={() => viewMovements(pos)}
+                            title="Voir Mouvements"
+                          >
+                            <FileText size={14} />
+                          </Button>
                           <Button 
                             variant="ghost" 
                             size="icon" 
@@ -2726,6 +2768,147 @@ const PositionsPage = () => {
           )}
         </CardContent>
       </Card>
+
+      {/* Dialog Ajouter Mouvement */}
+      <Dialog open={movementDialogOpen} onOpenChange={setMovementDialogOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Ajouter un Mouvement</DialogTitle>
+            {selectedPositionForMovement && (
+              <p className="text-sm text-muted-foreground">
+                {selectedPositionForMovement.platform} - {selectedPositionForMovement.asset}
+              </p>
+            )}
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label>Type de Mouvement</Label>
+              <Select value={newMovement.movement_type} onValueChange={(v) => setNewMovement({...newMovement, movement_type: v})}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {movementTypes.map(mt => (
+                    <SelectItem key={mt.value} value={mt.value}>
+                      <span className={mt.color}>{mt.label}</span>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label>Montant</Label>
+                <Input 
+                  type="number" 
+                  step="0.01"
+                  value={newMovement.amount} 
+                  onChange={(e) => setNewMovement({...newMovement, amount: parseFloat(e.target.value) || 0})}
+                />
+              </div>
+              <div>
+                <Label>Asset</Label>
+                <Select value={newMovement.asset} onValueChange={(v) => setNewMovement({...newMovement, asset: v})}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {assets.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            
+            <div>
+              <Label>Date</Label>
+              <Input 
+                type="date" 
+                value={newMovement.date} 
+                onChange={(e) => setNewMovement({...newMovement, date: e.target.value})}
+              />
+            </div>
+            
+            <div>
+              <Label>Hash Transaction (optionnel)</Label>
+              <Input 
+                value={newMovement.tx_hash} 
+                onChange={(e) => setNewMovement({...newMovement, tx_hash: e.target.value})}
+                placeholder="0x..."
+                className="font-mono text-xs"
+              />
+            </div>
+            
+            <div>
+              <Label>Notes</Label>
+              <Input 
+                value={newMovement.notes} 
+                onChange={(e) => setNewMovement({...newMovement, notes: e.target.value})}
+                placeholder="Notes optionnelles..."
+              />
+            </div>
+            
+            <Button onClick={handleCreateMovement} className="w-full">Enregistrer le Mouvement</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog Voir Mouvements */}
+      <Dialog open={movementsDialogOpen} onOpenChange={setMovementsDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Historique des Mouvements</DialogTitle>
+            {selectedPositionForMovement && (
+              <p className="text-sm text-muted-foreground">
+                {selectedPositionForMovement.platform} - {selectedPositionForMovement.product_type} - {selectedPositionForMovement.asset}
+              </p>
+            )}
+          </DialogHeader>
+          {selectedPositionMovements.length > 0 ? (
+            <ScrollArea className="h-[300px]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Date</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="text-right">Montant</TableHead>
+                    <TableHead>Asset</TableHead>
+                    <TableHead>Notes</TableHead>
+                    <TableHead className="w-[60px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {selectedPositionMovements.map((mov) => (
+                    <TableRow key={mov.id}>
+                      <TableCell className="text-sm">{new Date(mov.date).toLocaleDateString("fr-FR")}</TableCell>
+                      <TableCell>
+                        <span className={getMovementTypeColor(mov.movement_type)}>
+                          {getMovementTypeLabel(mov.movement_type)}
+                        </span>
+                      </TableCell>
+                      <TableCell className={`text-right font-mono ${mov.movement_type === "impermanent_loss" ? "text-red-400" : "text-green-400"}`}>
+                        {mov.movement_type === "impermanent_loss" ? "-" : "+"}{mov.amount?.toFixed(2)}
+                      </TableCell>
+                      <TableCell className="font-mono">{mov.asset}</TableCell>
+                      <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">{mov.notes || "-"}</TableCell>
+                      <TableCell>
+                        <Button 
+                          variant="ghost" 
+                          size="icon"
+                          className="h-7 w-7 text-red-400 hover:text-red-300"
+                          onClick={() => handleDeleteMovement(mov.id)}
+                        >
+                          <Trash2 size={14} />
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground">
+              Aucun mouvement enregistré pour cette position
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Edit Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
