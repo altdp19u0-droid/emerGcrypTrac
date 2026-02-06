@@ -2631,10 +2631,12 @@ const PositionsPage = () => {
           <CardContent>
             <div className="flex flex-wrap gap-4">
               {Object.entries(totalsByAsset).map(([asset, data]) => (
-                <div key={asset} className="p-3 bg-zinc-800/50 rounded-lg">
+                <div key={asset} className="p-3 bg-zinc-800/50 rounded-lg min-w-[150px]">
                   <span className="font-bold text-lg">{asset}</span>
-                  <p className="text-sm text-muted-foreground">Investi: {data.amount.toFixed(2)}</p>
-                  <p className="text-sm text-green-400">Gains: +{data.estimated_earnings.toFixed(2)}</p>
+                  <p className="text-sm text-muted-foreground">Investi: {data.amount?.toFixed(2)}</p>
+                  <p className="text-sm text-green-400">Réalisé: +{(data.realized_yield || 0).toFixed(2)}</p>
+                  <p className="text-xs text-muted-foreground">Estimé: +{data.estimated_earnings?.toFixed(2)}</p>
+                  {data.total_loss > 0 && <p className="text-sm text-red-400">Pertes: -{data.total_loss.toFixed(2)}</p>}
                 </div>
               ))}
             </div>
