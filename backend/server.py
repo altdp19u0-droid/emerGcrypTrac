@@ -1751,6 +1751,136 @@ async def get_fiat_transactions(
         "current_balance": running_balance
     }
 
+@api_router.put("/fiat-transactions/{tx_id}")
+async def update_fiat_transaction(tx_id: str, tx_data: FiatTransactionUpdate, current_user: dict = Depends(get_current_user)):
+    """Update an existing fiat transaction"""
+    user_id = current_user["id"]
+    
+    # Find the existing transaction
+    existing = await db.fiat_transactions.find_one({"id": tx_id, "user_id": user_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    # Get the account
+    account = await db.fiat_accounts.find_one({"id": existing["account_id"], "user_id": user_id}, {"_id": 0})
+    if not account:
+        raise HTTPException(status_code=404, detail="Account not found")
+    
+    # Calculate balance difference if amount changed
+    old_amount = existing.get("amount", 0)
+    new_amount = tx_data.amount if tx_data.amount is not None else old_amount
+    amount_diff = new_amount - old_amount
+    
+    # Build update dict with only provided fields
+    update_data = {}
+    if tx_data.type is not None:
+        update_data["type"] = tx_data.type
+    if tx_data.amount is not None:
+        update_data["amount"] = tx_data.amount
+    if tx_data.description is not None:
+        update_data["description"] = tx_data.description
+    if tx_data.date is not None:
+        update_data["date"] = tx_data.date
+    if tx_data.source_type is not None:
+        update_data["source_type"] = tx_data.source_type
+    if tx_data.source_account_id is not None:
+        update_data["source_account_id"] = tx_data.source_account_id
+    if tx_data.source_wallet_id is not None:
+        update_data["source_wallet_id"] = tx_data.source_wallet_id
+    if tx_data.source_wallet_address is not None:
+        update_data["source_wallet_address"] = tx_data.source_wallet_address
+    if tx_data.dest_type is not None:
+        update_data["dest_type"] = tx_data.dest_type
+    if tx_data.dest_account_id is not None:
+        update_data["dest_account_id"] = tx_data.dest_account_id
+    if tx_data.dest_wallet_id is not None:
+        update_data["dest_wallet_id"] = tx_data.dest_wallet_id
+    if tx_data.dest_wallet_address is not None:
+        update_data["dest_wallet_address"] = tx_data.dest_wallet_address
+    
+    # Resolve source/dest names if changed
+    if tx_data.source_type or tx_data.source_account_id or tx_data.source_wallet_id:
+        source_type = tx_data.source_type or existing.get("source_type", "bank")
+        if source_type == "bank":
+            src_account_id = tx_data.source_account_id or existing.get("source_account_id")
+            if src_account_id:
+                src_account = await db.fiat_accounts.find_one({"id": src_account_id}, {"_id": 0})
+                update_data["source_name"] = src_account["name"] if src_account else "Compte inconnu"
+            else:
+                update_data["source_name"] = None
+        elif source_type == "wallet":
+            src_wallet_id = tx_data.source_wallet_id or existing.get("source_wallet_id")
+            if src_wallet_id:
+                src_wallet = await db.wallets.find_one({"id": src_wallet_id}, {"_id": 0})
+                update_data["source_name"] = src_wallet["name"] if src_wallet else "Wallet inconnu"
+            else:
+                update_data["source_name"] = tx_data.source_wallet_address or existing.get("source_wallet_address")
+        else:
+            update_data["source_name"] = "Externe"
+    
+    if tx_data.dest_type or tx_data.dest_account_id or tx_data.dest_wallet_id:
+        dest_type = tx_data.dest_type or existing.get("dest_type", "bank")
+        if dest_type == "bank":
+            dest_account_id = tx_data.dest_account_id or existing.get("dest_account_id")
+            if dest_account_id:
+                dest_account = await db.fiat_accounts.find_one({"id": dest_account_id}, {"_id": 0})
+                update_data["dest_name"] = dest_account["name"] if dest_account else "Compte inconnu"
+            else:
+                update_data["dest_name"] = None
+        elif dest_type == "wallet":
+            dest_wallet_id = tx_data.dest_wallet_id or existing.get("dest_wallet_id")
+            if dest_wallet_id:
+                dest_wallet = await db.wallets.find_one({"id": dest_wallet_id}, {"_id": 0})
+                update_data["dest_name"] = dest_wallet["name"] if dest_wallet else "Wallet inconnu"
+            else:
+                update_data["dest_name"] = tx_data.dest_wallet_address or existing.get("dest_wallet_address")
+        else:
+            update_data["dest_name"] = "Externe"
+    
+    if not update_data:
+        return {"message": "No changes provided", "id": tx_id}
+    
+    # Update the transaction
+    await db.fiat_transactions.update_one(
+        {"id": tx_id, "user_id": user_id},
+        {"$set": update_data}
+    )
+    
+    # Update account balance if amount changed
+    if amount_diff != 0:
+        new_balance = account["balance"] + amount_diff
+        await db.fiat_accounts.update_one(
+            {"id": account["id"]},
+            {"$set": {"balance": new_balance}}
+        )
+        return {"message": "Transaction updated", "id": tx_id, "new_balance": new_balance}
+    
+    return {"message": "Transaction updated", "id": tx_id}
+
+@api_router.delete("/fiat-transactions/{tx_id}")
+async def delete_fiat_transaction(tx_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a fiat transaction and update account balance"""
+    user_id = current_user["id"]
+    
+    # Find the transaction
+    tx = await db.fiat_transactions.find_one({"id": tx_id, "user_id": user_id}, {"_id": 0})
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    # Get account and reverse the amount
+    account = await db.fiat_accounts.find_one({"id": tx["account_id"], "user_id": user_id}, {"_id": 0})
+    if account:
+        new_balance = account["balance"] - tx.get("amount", 0)
+        await db.fiat_accounts.update_one(
+            {"id": account["id"]},
+            {"$set": {"balance": new_balance}}
+        )
+    
+    # Delete the transaction
+    await db.fiat_transactions.delete_one({"id": tx_id, "user_id": user_id})
+    
+    return {"message": "Transaction deleted", "new_balance": new_balance if account else None}
+
 # ==================== PORTFOLIO ENDPOINTS ====================
 
 @api_router.get("/portfolio/summary")
