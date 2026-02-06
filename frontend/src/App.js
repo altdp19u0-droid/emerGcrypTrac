@@ -2533,6 +2533,7 @@ const FiatPage = () => {
                             <TableHead className="text-right text-red-400">Débit</TableHead>
                             <TableHead className="text-right text-green-400">Crédit</TableHead>
                             <TableHead className="text-right">Solde</TableHead>
+                            <TableHead className="w-[80px] text-center">Actions</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
