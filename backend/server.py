@@ -1582,6 +1582,67 @@ async def delete_transaction(tx_id: str, current_user: dict = Depends(get_curren
         raise HTTPException(status_code=404, detail="Transaction not found")
     return {"message": "Transaction deleted"}
 
+@api_router.put("/transactions/{tx_id}")
+async def update_transaction(tx_id: str, tx_data: TransactionUpdate, current_user: dict = Depends(get_current_user)):
+    """Update an existing crypto transaction (manual transactions only)"""
+    user_id = current_user["id"]
+    
+    # Find the existing transaction
+    existing = await db.transactions.find_one({"id": tx_id, "user_id": user_id}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    # Only allow editing manual transactions
+    if existing.get("source") not in ["manual", "csv_import"]:
+        raise HTTPException(status_code=400, detail="Seules les transactions manuelles peuvent être modifiées")
+    
+    # Build update dict with only provided fields
+    update_data = {}
+    if tx_data.type is not None:
+        update_data["type"] = tx_data.type
+    if tx_data.asset is not None:
+        update_data["asset"] = tx_data.asset
+    if tx_data.amount is not None:
+        update_data["amount"] = tx_data.amount
+    if tx_data.price_usd is not None:
+        update_data["price_usd"] = tx_data.price_usd
+    if tx_data.price_eur is not None:
+        update_data["price_eur"] = tx_data.price_eur
+    if tx_data.fees is not None:
+        update_data["fees"] = tx_data.fees
+    if tx_data.fees_currency is not None:
+        update_data["fees_currency"] = tx_data.fees_currency
+    if tx_data.date is not None:
+        update_data["date"] = tx_data.date
+    if tx_data.counterparty_wallet is not None:
+        update_data["counterparty_wallet"] = tx_data.counterparty_wallet
+    
+    # Auto-calculate values if amount or prices changed
+    amount = tx_data.amount if tx_data.amount is not None else existing.get("amount", 0)
+    price_usd = tx_data.price_usd if tx_data.price_usd is not None else existing.get("price_usd", 0)
+    price_eur = tx_data.price_eur if tx_data.price_eur is not None else existing.get("price_eur", 0)
+    
+    if tx_data.value_usd is not None:
+        update_data["value_usd"] = tx_data.value_usd
+    elif tx_data.amount is not None or tx_data.price_usd is not None:
+        update_data["value_usd"] = abs(amount) * price_usd
+    
+    if tx_data.value_eur is not None:
+        update_data["value_eur"] = tx_data.value_eur
+    elif tx_data.amount is not None or tx_data.price_eur is not None:
+        update_data["value_eur"] = abs(amount) * price_eur
+    
+    if not update_data:
+        return {"message": "No changes provided", "id": tx_id}
+    
+    # Update the transaction
+    await db.transactions.update_one(
+        {"id": tx_id, "user_id": user_id},
+        {"$set": update_data}
+    )
+    
+    return {"message": "Transaction updated", "id": tx_id}
+
 @api_router.patch("/transactions/{tx_id}/spam")
 async def toggle_spam_transaction(tx_id: str, current_user: dict = Depends(get_current_user)):
     """Toggle spam status for a transaction"""
