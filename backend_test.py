@@ -367,11 +367,20 @@ class CryptoTrackAPITester:
         # Test authentication
         self.test_auth_endpoints()
         
-        # Test fiat accounts
-        self.test_fiat_accounts()
+        # Test wallets (needed for crypto transactions)
+        success, wallets_response = self.run_test(
+            "Get Wallets",
+            "GET",
+            "wallets",
+            200
+        )
         
-        # Test fiat transactions CRUD (main focus)
-        self.test_fiat_transactions_crud()
+        if success:
+            wallets = wallets_response if isinstance(wallets_response, list) else []
+            print(f"Found {len(wallets)} wallets")
+        
+        # Test crypto transactions CRUD (main focus)
+        self.test_crypto_transactions_crud()
         
         # Print summary
         print(f"\n📊 Test Summary:")
