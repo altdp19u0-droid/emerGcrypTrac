@@ -2586,6 +2586,30 @@ const FiatPage = () => {
                               <TableCell className="text-right font-mono font-medium">
                                 {tx.running_balance?.toFixed(2) || "-"}
                               </TableCell>
+                              <TableCell className="text-center">
+                                <div className="flex items-center justify-center gap-1">
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon" 
+                                    className="h-7 w-7 text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                                    onClick={() => openEditDialog(tx)}
+                                    data-testid={`edit-tx-${tx.id}`}
+                                    title="Modifier"
+                                  >
+                                    <Edit2 size={14} />
+                                  </Button>
+                                  <Button 
+                                    variant="ghost" 
+                                    size="icon"
+                                    className="h-7 w-7 text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                                    onClick={() => handleDeleteTransaction(tx.id)}
+                                    data-testid={`delete-tx-${tx.id}`}
+                                    title="Supprimer"
+                                  >
+                                    <Trash2 size={14} />
+                                  </Button>
+                                </div>
+                              </TableCell>
                             </TableRow>
                           ))}
                         </TableBody>
