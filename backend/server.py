@@ -258,6 +258,20 @@ class Transaction(BaseModel):
     is_spam: bool = False
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
+class TransactionUpdate(BaseModel):
+    """Model for updating an existing crypto transaction"""
+    type: Optional[str] = None
+    asset: Optional[str] = None
+    amount: Optional[float] = None
+    price_usd: Optional[float] = None
+    price_eur: Optional[float] = None
+    value_usd: Optional[float] = None
+    value_eur: Optional[float] = None
+    fees: Optional[float] = None
+    fees_currency: Optional[str] = None
+    date: Optional[str] = None
+    counterparty_wallet: Optional[str] = None
+
 # ==================== ADDRESS CLASSIFICATION ====================
 
 class AddressClassification(BaseModel):
