@@ -2119,11 +2119,102 @@ async def update_position(position_id: str, pos_data: PositionUpdate, current_us
 
 @api_router.delete("/positions/{position_id}")
 async def delete_position(position_id: str, current_user: dict = Depends(get_current_user)):
-    """Delete a position"""
+    """Delete a position and all its movements"""
     result = await db.positions.delete_one({"id": position_id, "user_id": current_user["id"]})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Position not found")
+    # Also delete all movements for this position
+    await db.position_movements.delete_many({"position_id": position_id, "user_id": current_user["id"]})
     return {"message": "Position deleted"}
+
+# ==================== POSITION MOVEMENTS ENDPOINTS ====================
+
+@api_router.post("/position-movements", response_model=dict)
+async def create_position_movement(movement: PositionMovementCreate, current_user: dict = Depends(get_current_user)):
+    """Create a new movement for a position (yield, withdrawal, loss)"""
+    # Verify position exists and belongs to user
+    position = await db.positions.find_one({"id": movement.position_id, "user_id": current_user["id"]}, {"_id": 0})
+    if not position:
+        raise HTTPException(status_code=404, detail="Position not found")
+    
+    mov_dict = movement.model_dump()
+    mov_dict["date"] = mov_dict.get("date") or datetime.now(timezone.utc).isoformat()
+    mov = PositionMovement(user_id=current_user["id"], **mov_dict)
+    doc = mov.model_dump()
+    await db.position_movements.insert_one(doc)
+    return {"id": mov.id, "message": "Movement created"}
+
+@api_router.get("/position-movements")
+async def get_position_movements(position_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """Get all movements for user, optionally filtered by position"""
+    query = {"user_id": current_user["id"]}
+    if position_id:
+        query["position_id"] = position_id
+    
+    movements = await db.position_movements.find(query, {"_id": 0}).to_list(1000)
+    
+    # Group by type for summary
+    summary = {
+        "yield_realized": {"count": 0, "total": 0},
+        "capital_withdrawal": {"count": 0, "total": 0},
+        "impermanent_loss": {"count": 0, "total": 0}
+    }
+    for mov in movements:
+        mt = mov.get("movement_type", "")
+        if mt in summary:
+            summary[mt]["count"] += 1
+            summary[mt]["total"] += mov.get("amount", 0)
+    
+    return {
+        "movements": movements,
+        "summary": summary,
+        "total_movements": len(movements)
+    }
+
+@api_router.get("/position-movements/{position_id}")
+async def get_movements_for_position(position_id: str, current_user: dict = Depends(get_current_user)):
+    """Get all movements for a specific position"""
+    movements = await db.position_movements.find(
+        {"position_id": position_id, "user_id": current_user["id"]}, 
+        {"_id": 0}
+    ).to_list(1000)
+    
+    # Calculate totals
+    total_yield = sum(m.get("amount", 0) for m in movements if m.get("movement_type") == "yield_realized")
+    total_withdrawal = sum(m.get("amount", 0) for m in movements if m.get("movement_type") == "capital_withdrawal")
+    total_loss = sum(m.get("amount", 0) for m in movements if m.get("movement_type") == "impermanent_loss")
+    
+    return {
+        "movements": movements,
+        "total_yield_realized": total_yield,
+        "total_capital_withdrawn": total_withdrawal,
+        "total_loss": total_loss
+    }
+
+@api_router.put("/position-movements/{movement_id}")
+async def update_position_movement(movement_id: str, mov_data: PositionMovementUpdate, current_user: dict = Depends(get_current_user)):
+    """Update an existing movement"""
+    existing = await db.position_movements.find_one({"id": movement_id, "user_id": current_user["id"]}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Movement not found")
+    
+    update_data = {k: v for k, v in mov_data.model_dump().items() if v is not None}
+    if not update_data:
+        return {"message": "No changes provided", "id": movement_id}
+    
+    await db.position_movements.update_one(
+        {"id": movement_id, "user_id": current_user["id"]},
+        {"$set": update_data}
+    )
+    return {"message": "Movement updated", "id": movement_id}
+
+@api_router.delete("/position-movements/{movement_id}")
+async def delete_position_movement(movement_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a movement"""
+    result = await db.position_movements.delete_one({"id": movement_id, "user_id": current_user["id"]})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Movement not found")
+    return {"message": "Movement deleted"}
 
 # ==================== PORTFOLIO ENDPOINTS ====================
 
