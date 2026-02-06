@@ -414,6 +414,38 @@ class PositionUpdate(BaseModel):
     unlock_date: Optional[str] = None
     notes: Optional[str] = None
 
+# ==================== POSITION MOVEMENTS MODELS ====================
+
+class PositionMovementCreate(BaseModel):
+    position_id: str
+    movement_type: str  # yield_realized, capital_withdrawal, impermanent_loss
+    amount: float
+    asset: str  # Asset reçu ou perdu
+    date: Optional[str] = None
+    tx_hash: Optional[str] = None  # Hash de transaction si on-chain
+    notes: str = ""
+
+class PositionMovement(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    position_id: str
+    movement_type: str  # yield_realized, capital_withdrawal, impermanent_loss
+    amount: float
+    asset: str
+    date: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    tx_hash: Optional[str] = None
+    notes: str = ""
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class PositionMovementUpdate(BaseModel):
+    movement_type: Optional[str] = None
+    amount: Optional[float] = None
+    asset: Optional[str] = None
+    date: Optional[str] = None
+    tx_hash: Optional[str] = None
+    notes: Optional[str] = None
+
 # ==================== API KEY MODELS ====================
 
 class EtherscanApiKeyRequest(BaseModel):
