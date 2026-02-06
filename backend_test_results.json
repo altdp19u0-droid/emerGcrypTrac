@@ -1,0 +1,88 @@
+{
+  "summary": {
+    "tests_run": 13,
+    "tests_passed": 13,
+    "success_rate": 100.0,
+    "timestamp": "2026-02-06T16:19:04.311872"
+  },
+  "results": [
+    {
+      "test": "Login",
+      "success": true,
+      "details": "Status: 200, Expected: 200",
+      "timestamp": "2026-02-06T16:19:03.884953"
+    },
+    {
+      "test": "Get Current User",
+      "success": true,
+      "details": "Status: 200, Expected: 200",
+      "timestamp": "2026-02-06T16:19:03.962876"
+    },
+    {
+      "test": "Get Fiat Accounts",
+      "success": true,
+      "details": "Status: 200, Expected: 200",
+      "timestamp": "2026-02-06T16:19:04.039453"
+    },
+    {
+      "test": "Get Fiat Accounts for Transactions",
+      "success": true,
+      "details": "Status: 200, Expected: 200",
+      "timestamp": "2026-02-06T16:19:04.075818"
+    },
+    {
+      "test": "Create Fiat Transaction",
+      "success": true,
+      "details": "Status: 200, Expected: 200",
+      "timestamp": "2026-02-06T16:19:04.113088"
+    },
+    {
+      "test": "Get Fiat Transactions",
+      "success": true,
+      "details": "Status: 200, Expected: 200",
+      "timestamp": "2026-02-06T16:19:04.151448"
+    },
+    {
+      "test": "Update Fiat Transaction (PUT)",
+      "success": true,
+      "details": "Status: 200, Expected: 200",
+      "timestamp": "2026-02-06T16:19:04.191003"
+    },
+    {
+      "test": "Verify Transaction Update",
+      "success": true,
+      "details": "Status: 200, Expected: 200",
+      "timestamp": "2026-02-06T16:19:04.229129"
+    },
+    {
+      "test": "Verify Description Update",
+      "success": true,
+      "details": "Description updated to: Updated test transaction description",
+      "timestamp": "2026-02-06T16:19:04.229590"
+    },
+    {
+      "test": "Verify Amount Update",
+      "success": true,
+      "details": "Amount updated to: 150.75",
+      "timestamp": "2026-02-06T16:19:04.229612"
+    },
+    {
+      "test": "Delete Fiat Transaction",
+      "success": true,
+      "details": "Status: 200, Expected: 200",
+      "timestamp": "2026-02-06T16:19:04.276650"
+    },
+    {
+      "test": "Verify Transaction Deletion",
+      "success": true,
+      "details": "Status: 200, Expected: 200",
+      "timestamp": "2026-02-06T16:19:04.310991"
+    },
+    {
+      "test": "Verify Transaction Deleted",
+      "success": true,
+      "details": "Transaction successfully removed from list",
+      "timestamp": "2026-02-06T16:19:04.311704"
+    }
+  ]
+}
