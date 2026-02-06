@@ -378,6 +378,42 @@ class CSVImportRequest(BaseModel):
     wallet_id: str
     csv_data: str
 
+# ==================== POSITIONS/INVESTMENTS MODELS ====================
+
+class PositionCreate(BaseModel):
+    platform: str  # Bleap, Neverless, Frankencoin, 8Lends...
+    product_type: str  # savings, vault, strategy, prime, lending, staking...
+    asset: str  # EURA, EURC, ZCHF, USDC...
+    amount: float
+    apy: float = 0.0  # Taux annuel en %
+    deposit_date: Optional[str] = None
+    unlock_date: Optional[str] = None  # Date de déblocage (pour produits à terme)
+    notes: str = ""
+
+class Position(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+    user_id: str
+    platform: str
+    product_type: str
+    asset: str
+    amount: float
+    apy: float = 0.0
+    deposit_date: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    unlock_date: Optional[str] = None
+    notes: str = ""
+    created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+
+class PositionUpdate(BaseModel):
+    platform: Optional[str] = None
+    product_type: Optional[str] = None
+    asset: Optional[str] = None
+    amount: Optional[float] = None
+    apy: Optional[float] = None
+    deposit_date: Optional[str] = None
+    unlock_date: Optional[str] = None
+    notes: Optional[str] = None
+
 # ==================== API KEY MODELS ====================
 
 class EtherscanApiKeyRequest(BaseModel):
