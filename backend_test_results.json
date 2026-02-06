@@ -1,88 +1,106 @@
 {
   "summary": {
-    "tests_run": 13,
-    "tests_passed": 13,
+    "tests_run": 16,
+    "tests_passed": 16,
     "success_rate": 100.0,
-    "timestamp": "2026-02-06T16:19:04.311872"
+    "timestamp": "2026-02-06T16:31:46.320223"
   },
   "results": [
     {
       "test": "Login",
       "success": true,
       "details": "Status: 200, Expected: 200",
-      "timestamp": "2026-02-06T16:19:03.884953"
+      "timestamp": "2026-02-06T16:31:45.821597"
     },
     {
       "test": "Get Current User",
       "success": true,
       "details": "Status: 200, Expected: 200",
-      "timestamp": "2026-02-06T16:19:03.962876"
+      "timestamp": "2026-02-06T16:31:45.859248"
     },
     {
-      "test": "Get Fiat Accounts",
+      "test": "Get Wallets",
       "success": true,
       "details": "Status: 200, Expected: 200",
-      "timestamp": "2026-02-06T16:19:04.039453"
+      "timestamp": "2026-02-06T16:31:45.900094"
     },
     {
-      "test": "Get Fiat Accounts for Transactions",
+      "test": "Get Wallets for Crypto Transactions",
       "success": true,
       "details": "Status: 200, Expected: 200",
-      "timestamp": "2026-02-06T16:19:04.075818"
+      "timestamp": "2026-02-06T16:31:45.949050"
     },
     {
-      "test": "Create Fiat Transaction",
+      "test": "Create Manual Crypto Transaction",
       "success": true,
       "details": "Status: 200, Expected: 200",
-      "timestamp": "2026-02-06T16:19:04.113088"
+      "timestamp": "2026-02-06T16:31:45.982753"
     },
     {
-      "test": "Get Fiat Transactions",
+      "test": "Get Crypto Transactions",
       "success": true,
       "details": "Status: 200, Expected: 200",
-      "timestamp": "2026-02-06T16:19:04.151448"
+      "timestamp": "2026-02-06T16:31:46.020221"
     },
     {
-      "test": "Update Fiat Transaction (PUT)",
+      "test": "Update Manual Crypto Transaction (PUT)",
       "success": true,
       "details": "Status: 200, Expected: 200",
-      "timestamp": "2026-02-06T16:19:04.191003"
+      "timestamp": "2026-02-06T16:31:46.057139"
     },
     {
-      "test": "Verify Transaction Update",
+      "test": "Verify Crypto Transaction Update",
       "success": true,
       "details": "Status: 200, Expected: 200",
-      "timestamp": "2026-02-06T16:19:04.229129"
+      "timestamp": "2026-02-06T16:31:46.091446"
     },
     {
-      "test": "Verify Description Update",
+      "test": "Verify Type Update",
       "success": true,
-      "details": "Description updated to: Updated test transaction description",
-      "timestamp": "2026-02-06T16:19:04.229590"
+      "details": "Type updated to: Sell",
+      "timestamp": "2026-02-06T16:31:46.092130"
     },
     {
       "test": "Verify Amount Update",
       "success": true,
-      "details": "Amount updated to: 150.75",
-      "timestamp": "2026-02-06T16:19:04.229612"
+      "details": "Amount updated to: -150.0",
+      "timestamp": "2026-02-06T16:31:46.092152"
     },
     {
-      "test": "Delete Fiat Transaction",
+      "test": "Verify Counterparty Update",
+      "success": true,
+      "details": "Counterparty updated to: Coinbase",
+      "timestamp": "2026-02-06T16:31:46.092159"
+    },
+    {
+      "test": "Create Blockchain Transaction",
       "success": true,
       "details": "Status: 200, Expected: 200",
-      "timestamp": "2026-02-06T16:19:04.276650"
+      "timestamp": "2026-02-06T16:31:46.129504"
     },
     {
-      "test": "Verify Transaction Deletion",
+      "test": "Update Blockchain Transaction (Should Fail)",
+      "success": true,
+      "details": "Status: 400, Expected: 400",
+      "timestamp": "2026-02-06T16:31:46.204121"
+    },
+    {
+      "test": "Delete Crypto Transaction",
       "success": true,
       "details": "Status: 200, Expected: 200",
-      "timestamp": "2026-02-06T16:19:04.310991"
+      "timestamp": "2026-02-06T16:31:46.283942"
     },
     {
-      "test": "Verify Transaction Deleted",
+      "test": "Verify Crypto Transaction Deletion",
+      "success": true,
+      "details": "Status: 200, Expected: 200",
+      "timestamp": "2026-02-06T16:31:46.319316"
+    },
+    {
+      "test": "Verify Crypto Transaction Deleted",
       "success": true,
       "details": "Transaction successfully removed from list",
-      "timestamp": "2026-02-06T16:19:04.311704"
+      "timestamp": "2026-02-06T16:31:46.319937"
     }
   ]
 }
