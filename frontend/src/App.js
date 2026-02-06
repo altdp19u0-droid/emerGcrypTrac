@@ -2642,29 +2642,39 @@ const FiatPage = () => {
                                 </Select>
                                 
                                 {newTransaction.dest_type === "bank" && (
-                                  <Select value={newTransaction.dest_account_id} onValueChange={(v) => setNewTransaction({...newTransaction, dest_account_id: v})}>
-                                    <SelectTrigger><SelectValue placeholder="Sélectionner le compte" /></SelectTrigger>
-                                    <SelectContent>
-                                      {accounts.filter(a => a.id !== selectedAccount.id).map(a => (
-                                        <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
-                                      ))}
-                                    </SelectContent>
-                                  </Select>
+                                  <>
+                                    {accounts.filter(a => a.id !== selectedAccount.id).length > 0 ? (
+                                      <Select value={newTransaction.dest_account_id} onValueChange={(v) => setNewTransaction({...newTransaction, dest_account_id: v})}>
+                                        <SelectTrigger><SelectValue placeholder="Sélectionner le compte" /></SelectTrigger>
+                                        <SelectContent>
+                                          {accounts.filter(a => a.id !== selectedAccount.id).map(a => (
+                                            <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    ) : (
+                                      <p className="text-sm text-amber-400">Vous n'avez qu'un seul compte. Créez un autre compte ou choisissez "Externe".</p>
+                                    )}
+                                  </>
                                 )}
                                 
                                 {newTransaction.dest_type === "wallet" && (
                                   <>
-                                    <Select value={newTransaction.dest_wallet_id} onValueChange={(v) => {
-                                      const wallet = wallets.find(w => w.id === v);
-                                      setNewTransaction({...newTransaction, dest_wallet_id: v, dest_wallet_address: wallet?.address || ""});
-                                    }}>
-                                      <SelectTrigger><SelectValue placeholder="Sélectionner le wallet" /></SelectTrigger>
-                                      <SelectContent>
-                                        {wallets.map(w => (
-                                          <SelectItem key={w.id} value={w.id}>{w.name} ({w.network})</SelectItem>
-                                        ))}
-                                      </SelectContent>
-                                    </Select>
+                                    {wallets.length > 0 ? (
+                                      <Select value={newTransaction.dest_wallet_id} onValueChange={(v) => {
+                                        const wallet = wallets.find(w => w.id === v);
+                                        setNewTransaction({...newTransaction, dest_wallet_id: v, dest_wallet_address: wallet?.address || ""});
+                                      }}>
+                                        <SelectTrigger><SelectValue placeholder="Sélectionner le wallet" /></SelectTrigger>
+                                        <SelectContent>
+                                          {wallets.map(w => (
+                                            <SelectItem key={w.id} value={w.id}>{w.name} ({w.network})</SelectItem>
+                                          ))}
+                                        </SelectContent>
+                                      </Select>
+                                    ) : (
+                                      <p className="text-sm text-amber-400">Aucun wallet disponible. Créez d'abord un wallet.</p>
+                                    )}
                                     {newTransaction.dest_wallet_id && (
                                       <Input value={newTransaction.dest_wallet_address} disabled placeholder="Adresse du wallet" className="font-mono text-xs" />
                                     )}
