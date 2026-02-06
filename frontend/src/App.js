@@ -2698,6 +2698,14 @@ const FiatPage = () => {
                                     placeholder="Référence ou adresse externe (optionnel)"
                                   />
                                 )}
+                                
+                                {newTransaction.dest_type === "exchange" && (
+                                  <Input 
+                                    value={newTransaction.dest_wallet_address} 
+                                    onChange={(e) => setNewTransaction({...newTransaction, dest_wallet_address: e.target.value})}
+                                    placeholder="Nom de l'exchange (ex: Kraken, Binance...)"
+                                  />
+                                )}
                               </div>
                             )}
 
