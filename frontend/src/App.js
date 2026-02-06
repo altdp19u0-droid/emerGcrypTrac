@@ -2936,6 +2936,14 @@ const FiatPage = () => {
                               placeholder="Référence ou adresse externe (optionnel)"
                             />
                           )}
+                          
+                          {editingTransaction.source_type === "exchange" && (
+                            <Input 
+                              value={editingTransaction.source_wallet_address || ""} 
+                              onChange={(e) => setEditingTransaction({...editingTransaction, source_wallet_address: e.target.value})}
+                              placeholder="Nom de l'exchange (ex: Kraken, Binance...)"
+                            />
+                          )}
                         </div>
                       )}
 
