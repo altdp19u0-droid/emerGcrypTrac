@@ -5,21 +5,27 @@ Application de suivi de portfolio crypto avec gestion des comptes Fiat intégré
 
 ## Mise à jour (06/02/2026)
 
-### Fonctionnalités Fiat
-1. **Comptes Fiat avec format comptable**
-   - Colonnes Débit/Crédit/Solde courant
-   - Origine/Destination pour chaque transaction
+### Fonctionnalités Transactions
 
-2. **NOUVEAU: Modification des transactions** ✅
-   - Bouton Modifier (crayon) dans colonne Actions
-   - Dialog d'édition pré-rempli
-   - Modification de: Type, Montant, Description, Date/Heure, Origine, Destination
-   - Mise à jour automatique du solde
+#### Transactions Fiat
+- ✅ Comptes Fiat avec format comptable (Débit/Crédit/Solde)
+- ✅ Origine/Destination pour chaque transaction
+- ✅ **Modification des transactions Fiat**
+- ✅ **Suppression des transactions Fiat**
 
-3. **NOUVEAU: Suppression des transactions** ✅
-   - Bouton Supprimer (poubelle) dans colonne Actions
-   - Confirmation avant suppression
-   - Ajustement automatique du solde
+#### Transactions Crypto
+- ✅ Sync multi-chaînes (ETH, Polygon, Arbitrum, Base, Optimism)
+- ✅ **Modification des transactions manuelles** (source=manual/csv_import)
+- ✅ **Suppression des transactions**
+- ✅ Protection: transactions blockchain non modifiables
+
+### Tableau Récapitulatif
+
+| Type | Page | Modifier | Supprimer |
+|------|------|----------|-----------|
+| Fiat | Fiat | ✅ | ✅ |
+| Crypto Manuel | Transactions | ✅ | ✅ |
+| Crypto Blockchain | Transactions | ❌ (protégé) | ✅ |
 
 ## Stack Technique
 - **Frontend**: React.js + Tailwind CSS + shadcn/ui + Recharts
@@ -34,16 +40,18 @@ Application de suivi de portfolio crypto avec gestion des comptes Fiat intégré
 - ✅ Transactions crypto avec sync blockchain
 - ✅ Comptes Fiat avec origine/destination
 - ✅ Tableau comptable Débit/Crédit/Solde
-- ✅ Transactions Fiat dans page Transactions
-- ✅ **Modification des transactions Fiat**
-- ✅ **Suppression des transactions Fiat**
+- ✅ Modification des transactions Fiat
+- ✅ Suppression des transactions Fiat
+- ✅ **Modification des transactions Crypto manuelles**
+- ✅ **Suppression des transactions Crypto**
 - ✅ P&L Calculator
 - ✅ Export PDF/CSV
 
 ## Compte de Test
 - **Username**: fiatdemo
 - **Password**: FiatDemo123
-- **Compte Fiat**: "Banque Principale" avec ~3000€
+- **Compte Fiat**: "Banque Principale"
+- **Wallet Test**: "Wallet Manuel Test"
 
 ## Backlog
 ### P1
@@ -54,4 +62,5 @@ Application de suivi de portfolio crypto avec gestion des comptes Fiat intégré
 ### P2
 - Support nouvelles chaînes
 - Intégration exchanges
+- Fonction Dupliquer transaction
 - Fonction Undo après suppression
