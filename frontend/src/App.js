@@ -1315,6 +1315,75 @@ const TransactionsPage = () => {
     }
   };
 
+  // Ouvrir le dialog d'édition pour une transaction crypto
+  const openEditCryptoDialog = (tx) => {
+    const txDate = new Date(tx.date);
+    setEditingCryptoTx({
+      ...tx,
+      date: txDate.toISOString().split("T")[0],
+      time: txDate.toTimeString().slice(0, 5),
+      amount: Math.abs(tx.amount)
+    });
+    setEditCryptoDialogOpen(true);
+  };
+
+  // Mettre à jour une transaction crypto
+  const handleUpdateCryptoTransaction = async () => {
+    if (!editingCryptoTx) return;
+    try {
+      const dateTime = editingCryptoTx.time 
+        ? `${editingCryptoTx.date}T${editingCryptoTx.time}:00`
+        : editingCryptoTx.date;
+      
+      // Adjust amount sign based on type
+      let finalAmount = Math.abs(editingCryptoTx.amount);
+      if (["Sell", "Transfer Out"].includes(editingCryptoTx.type)) {
+        finalAmount = -finalAmount;
+      }
+      
+      await api.put(`/transactions/${editingCryptoTx.id}`, {
+        type: editingCryptoTx.type,
+        asset: editingCryptoTx.asset,
+        amount: finalAmount,
+        price_usd: editingCryptoTx.price_usd,
+        price_eur: editingCryptoTx.price_eur,
+        fees: editingCryptoTx.fees,
+        fees_currency: editingCryptoTx.fees_currency,
+        date: dateTime,
+        counterparty_wallet: editingCryptoTx.counterparty_wallet
+      });
+      toast.success("Transaction modifiée");
+      setEditCryptoDialogOpen(false);
+      setEditingCryptoTx(null);
+      fetchTransactions();
+    } catch (error) {
+      const msg = error.response?.data?.detail || "Erreur lors de la modification";
+      toast.error(msg);
+    }
+  };
+
+  // Supprimer une transaction crypto
+  const handleDeleteCryptoTransaction = async (txId, txCategory) => {
+    if (txCategory === "fiat") {
+      toast.error("Utilisez la page Fiat pour supprimer les transactions fiat");
+      return;
+    }
+    if (window.confirm("Supprimer cette transaction ?")) {
+      try {
+        await api.delete(`/transactions/${txId}`);
+        toast.success("Transaction supprimée");
+        fetchTransactions();
+      } catch (error) {
+        toast.error("Erreur lors de la suppression");
+      }
+    }
+  };
+
+  // Check if transaction is editable (manual or csv_import only)
+  const isTransactionEditable = (tx) => {
+    return tx.tx_category !== "fiat" && ["manual", "csv_import"].includes(tx.source);
+  };
+
   const toggleFilter = (filterType, value) => {
     setFilters(prev => {
       const currentValues = prev[filterType];
