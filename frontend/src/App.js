@@ -2063,6 +2063,8 @@ const FiatPage = () => {
   const [loading, setLoading] = useState(true);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [txDialogOpen, setTxDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingTransaction, setEditingTransaction] = useState(null);
   const [newAccount, setNewAccount] = useState({ name: "", currency: "EUR", initial_balance: 0 });
   const [newTransaction, setNewTransaction] = useState({ 
     type: "deposit", 
