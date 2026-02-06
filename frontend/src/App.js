@@ -2245,6 +2245,7 @@ const PnLPage = () => {
 
 const PositionsPage = () => {
   const { accessToken } = useAuth();
+  const api = createAuthenticatedApi(accessToken);
   const [positions, setPositions] = useState([]);
   const [totalsByAsset, setTotalsByAsset] = useState({});
   const [loading, setLoading] = useState(true);
