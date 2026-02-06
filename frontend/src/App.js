@@ -2241,6 +2241,476 @@ const PnLPage = () => {
   );
 };
 
+// ==================== POSITIONS PAGE ====================
+
+const PositionsPage = () => {
+  const { accessToken } = useAuth();
+  const [positions, setPositions] = useState([]);
+  const [totalsByAsset, setTotalsByAsset] = useState({});
+  const [loading, setLoading] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [editingPosition, setEditingPosition] = useState(null);
+  const [newPosition, setNewPosition] = useState({
+    platform: "",
+    product_type: "savings",
+    asset: "EURA",
+    amount: 0,
+    apy: 0,
+    deposit_date: new Date().toISOString().split("T")[0],
+    unlock_date: "",
+    notes: ""
+  });
+
+  const platforms = ["Bleap", "Neverless", "Frankencoin", "8Lends", "Kraken", "Binance", "Autre"];
+  const productTypes = [
+    { value: "savings", label: "Savings" },
+    { value: "vault", label: "Vault" },
+    { value: "strategy", label: "Stratégie" },
+    { value: "prime", label: "Prime" },
+    { value: "lending", label: "Lending" },
+    { value: "staking", label: "Staking" },
+    { value: "liquidity", label: "Liquidity Pool" },
+    { value: "other", label: "Autre" }
+  ];
+  const assets = ["EURA", "EURC", "ZCHF", "USDC", "USDT", "ETH", "BTC", "EUR", "USD", "CHF"];
+
+  const fetchPositions = async () => {
+    try {
+      const response = await api.get("/positions");
+      setPositions(response.data.positions || []);
+      setTotalsByAsset(response.data.totals_by_asset || {});
+    } catch (error) {
+      toast.error("Erreur lors du chargement des positions");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { fetchPositions(); }, []);
+
+  const handleCreatePosition = async () => {
+    if (!newPosition.platform || !newPosition.amount) {
+      toast.error("Plateforme et montant requis");
+      return;
+    }
+    try {
+      await api.post("/positions", {
+        ...newPosition,
+        unlock_date: newPosition.unlock_date || null
+      });
+      toast.success("Position créée");
+      setDialogOpen(false);
+      setNewPosition({
+        platform: "",
+        product_type: "savings",
+        asset: "EURA",
+        amount: 0,
+        apy: 0,
+        deposit_date: new Date().toISOString().split("T")[0],
+        unlock_date: "",
+        notes: ""
+      });
+      fetchPositions();
+    } catch (error) {
+      toast.error("Erreur lors de la création");
+    }
+  };
+
+  const openEditDialog = (pos) => {
+    setEditingPosition({
+      ...pos,
+      deposit_date: pos.deposit_date?.split("T")[0] || "",
+      unlock_date: pos.unlock_date?.split("T")[0] || ""
+    });
+    setEditDialogOpen(true);
+  };
+
+  const handleUpdatePosition = async () => {
+    if (!editingPosition) return;
+    try {
+      await api.put(`/positions/${editingPosition.id}`, {
+        platform: editingPosition.platform,
+        product_type: editingPosition.product_type,
+        asset: editingPosition.asset,
+        amount: editingPosition.amount,
+        apy: editingPosition.apy,
+        deposit_date: editingPosition.deposit_date,
+        unlock_date: editingPosition.unlock_date || null,
+        notes: editingPosition.notes
+      });
+      toast.success("Position modifiée");
+      setEditDialogOpen(false);
+      setEditingPosition(null);
+      fetchPositions();
+    } catch (error) {
+      toast.error("Erreur lors de la modification");
+    }
+  };
+
+  const handleDeletePosition = async (id) => {
+    if (window.confirm("Supprimer cette position ?")) {
+      try {
+        await api.delete(`/positions/${id}`);
+        toast.success("Position supprimée");
+        fetchPositions();
+      } catch (error) {
+        toast.error("Erreur lors de la suppression");
+      }
+    }
+  };
+
+  const getProductTypeLabel = (value) => {
+    const pt = productTypes.find(p => p.value === value);
+    return pt ? pt.label : value;
+  };
+
+  // Calculate total value and earnings
+  const totalValue = positions.reduce((sum, p) => sum + (p.amount || 0), 0);
+  const totalEarnings = positions.reduce((sum, p) => sum + (p.estimated_earnings || 0), 0);
+
+  if (loading) return <div className="page-content"><RefreshCw className="animate-spin" /></div>;
+
+  return (
+    <div className="page-content" data-testid="positions-page">
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Positions / Investissements</h1>
+          <p className="page-subtitle">Gérez vos actifs en épargne, vault, stratégie</p>
+        </div>
+        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+          <DialogTrigger asChild>
+            <Button data-testid="add-position-btn"><Plus size={16} className="mr-2" />Nouvelle Position</Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg">
+            <DialogHeader><DialogTitle>Ajouter une Position</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Plateforme</Label>
+                  <Select value={newPosition.platform} onValueChange={(v) => setNewPosition({...newPosition, platform: v})}>
+                    <SelectTrigger><SelectValue placeholder="Sélectionner..." /></SelectTrigger>
+                    <SelectContent>
+                      {platforms.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Type de Produit</Label>
+                  <Select value={newPosition.product_type} onValueChange={(v) => setNewPosition({...newPosition, product_type: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {productTypes.map(pt => <SelectItem key={pt.value} value={pt.value}>{pt.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Asset</Label>
+                  <Select value={newPosition.asset} onValueChange={(v) => setNewPosition({...newPosition, asset: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {assets.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Montant</Label>
+                  <Input 
+                    type="number" 
+                    value={newPosition.amount} 
+                    onChange={(e) => setNewPosition({...newPosition, amount: parseFloat(e.target.value) || 0})}
+                    data-testid="position-amount-input"
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>APY (%)</Label>
+                  <Input 
+                    type="number" 
+                    step="0.1"
+                    value={newPosition.apy} 
+                    onChange={(e) => setNewPosition({...newPosition, apy: parseFloat(e.target.value) || 0})}
+                  />
+                </div>
+                <div>
+                  <Label>Date de Dépôt</Label>
+                  <Input 
+                    type="date" 
+                    value={newPosition.deposit_date} 
+                    onChange={(e) => setNewPosition({...newPosition, deposit_date: e.target.value})}
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <Label>Date de Déblocage (optionnel)</Label>
+                <Input 
+                  type="date" 
+                  value={newPosition.unlock_date} 
+                  onChange={(e) => setNewPosition({...newPosition, unlock_date: e.target.value})}
+                  placeholder="Laisser vide si pas de blocage"
+                />
+              </div>
+              
+              <div>
+                <Label>Notes</Label>
+                <Input 
+                  value={newPosition.notes} 
+                  onChange={(e) => setNewPosition({...newPosition, notes: e.target.value})}
+                  placeholder="Notes optionnelles..."
+                />
+              </div>
+              
+              <Button onClick={handleCreatePosition} className="w-full" data-testid="submit-position-btn">Créer la Position</Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+      </div>
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-full bg-blue-500/20">
+                <PiggyBank size={24} className="text-blue-400" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Total Investi</p>
+                <p className="text-2xl font-bold">{totalValue.toFixed(2)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-full bg-green-500/20">
+                <TrendingUp size={24} className="text-green-400" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Gains Estimés</p>
+                <p className="text-2xl font-bold text-green-400">+{totalEarnings.toFixed(2)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-full bg-purple-500/20">
+                <FileText size={24} className="text-purple-400" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Positions Actives</p>
+                <p className="text-2xl font-bold">{positions.length}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Totals by Asset */}
+      {Object.keys(totalsByAsset).length > 0 && (
+        <Card className="mb-6">
+          <CardHeader><CardTitle className="card-title-sm">Totaux par Asset</CardTitle></CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-4">
+              {Object.entries(totalsByAsset).map(([asset, data]) => (
+                <div key={asset} className="p-3 bg-zinc-800/50 rounded-lg">
+                  <span className="font-bold text-lg">{asset}</span>
+                  <p className="text-sm text-muted-foreground">Investi: {data.amount.toFixed(2)}</p>
+                  <p className="text-sm text-green-400">Gains: +{data.estimated_earnings.toFixed(2)}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Positions Table */}
+      <Card>
+        <CardHeader><CardTitle className="card-title-sm">Vos Positions</CardTitle></CardHeader>
+        <CardContent>
+          {positions.length > 0 ? (
+            <ScrollArea className="h-[400px]">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Plateforme</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead>Asset</TableHead>
+                    <TableHead className="text-right">Montant</TableHead>
+                    <TableHead className="text-right">APY</TableHead>
+                    <TableHead className="text-right">Gains Estimés</TableHead>
+                    <TableHead>Statut</TableHead>
+                    <TableHead className="w-[80px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {positions.map((pos) => (
+                    <TableRow key={pos.id}>
+                      <TableCell className="font-medium">{pos.platform}</TableCell>
+                      <TableCell>
+                        <Badge variant="outline">{getProductTypeLabel(pos.product_type)}</Badge>
+                      </TableCell>
+                      <TableCell className="font-mono">{pos.asset}</TableCell>
+                      <TableCell className="text-right font-mono">{pos.amount?.toFixed(2)}</TableCell>
+                      <TableCell className="text-right">{pos.apy}%</TableCell>
+                      <TableCell className="text-right text-green-400 font-mono">
+                        +{pos.estimated_earnings?.toFixed(2)}
+                      </TableCell>
+                      <TableCell>
+                        {pos.is_locked ? (
+                          <div className="flex items-center gap-1 text-amber-400">
+                            <Lock size={14} />
+                            <span className="text-xs">{pos.days_until_unlock}j</span>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1 text-green-400">
+                            <Check size={14} />
+                            <span className="text-xs">Liquide</span>
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex gap-1">
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            className="h-7 w-7 text-blue-400 hover:text-blue-300"
+                            onClick={() => openEditDialog(pos)}
+                            title="Modifier"
+                          >
+                            <Edit2 size={14} />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon"
+                            className="h-7 w-7 text-red-400 hover:text-red-300"
+                            onClick={() => handleDeletePosition(pos.id)}
+                            title="Supprimer"
+                          >
+                            <Trash2 size={14} />
+                          </Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </ScrollArea>
+          ) : (
+            <div className="empty-state">
+              <PiggyBank size={48} className="empty-icon" />
+              <h3>Aucune position</h3>
+              <p>Ajoutez vos investissements en épargne, vault ou stratégie</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Edit Dialog */}
+      <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader><DialogTitle>Modifier la Position</DialogTitle></DialogHeader>
+          {editingPosition && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Plateforme</Label>
+                  <Select value={editingPosition.platform} onValueChange={(v) => setEditingPosition({...editingPosition, platform: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {platforms.map(p => <SelectItem key={p} value={p}>{p}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Type de Produit</Label>
+                  <Select value={editingPosition.product_type} onValueChange={(v) => setEditingPosition({...editingPosition, product_type: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {productTypes.map(pt => <SelectItem key={pt.value} value={pt.value}>{pt.label}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Asset</Label>
+                  <Select value={editingPosition.asset} onValueChange={(v) => setEditingPosition({...editingPosition, asset: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {assets.map(a => <SelectItem key={a} value={a}>{a}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label>Montant</Label>
+                  <Input 
+                    type="number" 
+                    value={editingPosition.amount} 
+                    onChange={(e) => setEditingPosition({...editingPosition, amount: parseFloat(e.target.value) || 0})}
+                  />
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>APY (%)</Label>
+                  <Input 
+                    type="number" 
+                    step="0.1"
+                    value={editingPosition.apy} 
+                    onChange={(e) => setEditingPosition({...editingPosition, apy: parseFloat(e.target.value) || 0})}
+                  />
+                </div>
+                <div>
+                  <Label>Date de Dépôt</Label>
+                  <Input 
+                    type="date" 
+                    value={editingPosition.deposit_date} 
+                    onChange={(e) => setEditingPosition({...editingPosition, deposit_date: e.target.value})}
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <Label>Date de Déblocage (optionnel)</Label>
+                <Input 
+                  type="date" 
+                  value={editingPosition.unlock_date || ""} 
+                  onChange={(e) => setEditingPosition({...editingPosition, unlock_date: e.target.value})}
+                />
+              </div>
+              
+              <div>
+                <Label>Notes</Label>
+                <Input 
+                  value={editingPosition.notes || ""} 
+                  onChange={(e) => setEditingPosition({...editingPosition, notes: e.target.value})}
+                />
+              </div>
+              
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={() => setEditDialogOpen(false)} className="flex-1">Annuler</Button>
+                <Button onClick={handleUpdatePosition} className="flex-1">Enregistrer</Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+};
+
 // ==================== FIAT PAGE ====================
 
 const FiatPage = () => {
