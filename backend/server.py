@@ -2017,11 +2017,20 @@ async def get_positions(current_user: dict = Depends(get_current_user)):
         
         # Calculate days since deposit
         try:
-            deposit_date = datetime.fromisoformat(deposit_date_str.replace("Z", "+00:00"))
+            # Parse date string (might be just date or full ISO)
+            if "T" in deposit_date_str:
+                deposit_date = datetime.fromisoformat(deposit_date_str.replace("Z", "+00:00"))
+            else:
+                deposit_date = datetime.strptime(deposit_date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
             days_elapsed = (datetime.now(timezone.utc) - deposit_date).days
-            # Estimated earnings = amount * (apy/100) * (days/365)
-            pos["estimated_earnings"] = round(amount * (apy / 100) * (days_elapsed / 365), 2)
-            pos["days_elapsed"] = days_elapsed
+            # Only count positive days (past deposits)
+            if days_elapsed > 0:
+                # Estimated earnings = amount * (apy/100) * (days/365)
+                pos["estimated_earnings"] = round(amount * (apy / 100) * (days_elapsed / 365), 2)
+                pos["days_elapsed"] = days_elapsed
+            else:
+                pos["estimated_earnings"] = 0
+                pos["days_elapsed"] = 0
         except:
             pos["estimated_earnings"] = 0
             pos["days_elapsed"] = 0
