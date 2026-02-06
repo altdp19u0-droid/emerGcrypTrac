@@ -117,46 +117,52 @@ class CryptoTrackAPITester:
         
         return True
 
-    def test_fiat_transactions_crud(self):
-        """Test CRUD operations for fiat transactions"""
-        print(f"\n💳 Testing Fiat Transactions CRUD...")
+    def test_crypto_transactions_crud(self):
+        """Test CRUD operations for crypto transactions"""
+        print(f"\n₿ Testing Crypto Transactions CRUD...")
         
-        # First get accounts to work with
-        success, accounts_response = self.run_test(
-            "Get Fiat Accounts for Transactions",
+        # First get wallets to work with
+        success, wallets_response = self.run_test(
+            "Get Wallets for Crypto Transactions",
             "GET",
-            "fiat-accounts", 
+            "wallets", 
             200
         )
         
         if not success:
             return False
             
-        accounts = accounts_response if isinstance(accounts_response, list) else []
-        if not accounts:
-            print("❌ No fiat accounts found - cannot test transactions")
+        wallets = wallets_response if isinstance(wallets_response, list) else []
+        if not wallets:
+            print("❌ No wallets found - cannot test crypto transactions")
             return False
             
-        account = accounts[0]
-        account_id = account['id']
-        print(f"Using account: {account['name']} ({account_id})")
+        wallet = wallets[0]
+        wallet_id = wallet['id']
+        print(f"Using wallet: {wallet['name']} ({wallet_id})")
         
-        # 1. Create a test transaction
+        # 1. Create a manual crypto transaction
         test_transaction = {
-            "type": "deposit",
-            "amount": 100.50,
-            "description": "Test transaction for editing",
-            "account_id": account_id,
-            "date": "2024-01-15T10:30:00",
-            "source_type": "external",
-            "dest_type": "bank",
-            "dest_account_id": account_id
+            "type": "Buy",
+            "asset": "USDC",
+            "amount": 100.0,
+            "price_usd": 1.0,
+            "price_eur": 0.92,
+            "value_usd": 100.0,
+            "value_eur": 92.0,
+            "fees": 2.5,
+            "fees_currency": "EUR",
+            "wallet_id": wallet_id,
+            "wallet_name": wallet['name'],
+            "source": "manual",
+            "date": "2024-01-15",
+            "counterparty_wallet": "Binance"
         }
         
         success, create_response = self.run_test(
-            "Create Fiat Transaction",
+            "Create Manual Crypto Transaction",
             "POST",
-            "fiat-transactions",
+            "transactions",
             200,
             data=test_transaction
         )
@@ -166,16 +172,16 @@ class CryptoTrackAPITester:
             
         transaction_id = create_response.get('id')
         if not transaction_id:
-            self.log_test("Get Transaction ID", False, "No transaction ID returned")
+            self.log_test("Get Crypto Transaction ID", False, "No transaction ID returned")
             return False
             
-        print(f"✅ Created transaction with ID: {transaction_id}")
+        print(f"✅ Created crypto transaction with ID: {transaction_id}")
         
         # 2. Get transactions to verify creation
         success, transactions_response = self.run_test(
-            "Get Fiat Transactions",
+            "Get Crypto Transactions",
             "GET",
-            f"fiat-transactions?account_id={account_id}",
+            f"transactions?wallet_id={wallet_id}",
             200
         )
         
@@ -190,22 +196,26 @@ class CryptoTrackAPITester:
                 break
                 
         if not created_tx:
-            self.log_test("Find Created Transaction", False, "Transaction not found in list")
+            self.log_test("Find Created Crypto Transaction", False, "Transaction not found in list")
             return False
             
-        print(f"✅ Found created transaction: {created_tx.get('description')}")
+        print(f"✅ Found created crypto transaction: {created_tx.get('asset')} {created_tx.get('type')}")
         
-        # 3. Test UPDATE (PUT) - This is the main feature being tested
+        # 3. Test UPDATE (PUT) for manual transactions - This is the main feature being tested
         update_data = {
-            "description": "Updated test transaction description",
-            "amount": 150.75,
-            "type": "deposit"
+            "type": "Sell",
+            "asset": "USDC", 
+            "amount": -150.0,  # Negative for sell
+            "price_usd": 1.01,
+            "price_eur": 0.93,
+            "fees": 3.0,
+            "counterparty_wallet": "Coinbase"
         }
         
         success, update_response = self.run_test(
-            "Update Fiat Transaction (PUT)",
+            "Update Manual Crypto Transaction (PUT)",
             "PUT",
-            f"fiat-transactions/{transaction_id}",
+            f"transactions/{transaction_id}",
             200,
             data=update_data
         )
@@ -213,13 +223,13 @@ class CryptoTrackAPITester:
         if not success:
             return False
             
-        print(f"✅ Updated transaction successfully")
+        print(f"✅ Updated crypto transaction successfully")
         
         # 4. Verify the update by getting transactions again
         success, verify_response = self.run_test(
-            "Verify Transaction Update",
+            "Verify Crypto Transaction Update",
             "GET",
-            f"fiat-transactions?account_id={account_id}",
+            f"transactions?wallet_id={wallet_id}",
             200
         )
         
@@ -232,34 +242,83 @@ class CryptoTrackAPITester:
                     break
                     
             if updated_tx:
-                if updated_tx.get('description') == update_data['description']:
-                    self.log_test("Verify Description Update", True, f"Description updated to: {updated_tx.get('description')}")
+                if updated_tx.get('type') == update_data['type']:
+                    self.log_test("Verify Type Update", True, f"Type updated to: {updated_tx.get('type')}")
                 else:
-                    self.log_test("Verify Description Update", False, f"Expected: {update_data['description']}, Got: {updated_tx.get('description')}")
+                    self.log_test("Verify Type Update", False, f"Expected: {update_data['type']}, Got: {updated_tx.get('type')}")
                     
                 if abs(updated_tx.get('amount', 0) - update_data['amount']) < 0.01:
                     self.log_test("Verify Amount Update", True, f"Amount updated to: {updated_tx.get('amount')}")
                 else:
                     self.log_test("Verify Amount Update", False, f"Expected: {update_data['amount']}, Got: {updated_tx.get('amount')}")
+                    
+                if updated_tx.get('counterparty_wallet') == update_data['counterparty_wallet']:
+                    self.log_test("Verify Counterparty Update", True, f"Counterparty updated to: {updated_tx.get('counterparty_wallet')}")
+                else:
+                    self.log_test("Verify Counterparty Update", False, f"Expected: {update_data['counterparty_wallet']}, Got: {updated_tx.get('counterparty_wallet')}")
             else:
-                self.log_test("Find Updated Transaction", False, "Updated transaction not found")
+                self.log_test("Find Updated Crypto Transaction", False, "Updated transaction not found")
         
-        # 5. Test DELETE
+        # 5. Test UPDATE on non-manual transaction (should fail)
+        # First create a blockchain transaction
+        blockchain_transaction = {
+            "type": "Transfer In",
+            "asset": "ETH",
+            "amount": 1.0,
+            "price_usd": 2500.0,
+            "price_eur": 2300.0,
+            "value_usd": 2500.0,
+            "value_eur": 2300.0,
+            "fees": 0.01,
+            "fees_currency": "ETH",
+            "wallet_id": wallet_id,
+            "wallet_name": wallet['name'],
+            "source": "blockchain_ethereum",  # Non-manual source
+            "date": "2024-01-16",
+            "tx_hash": "0x123456789abcdef"
+        }
+        
+        success, blockchain_create_response = self.run_test(
+            "Create Blockchain Transaction",
+            "POST",
+            "transactions",
+            200,
+            data=blockchain_transaction
+        )
+        
+        if success:
+            blockchain_tx_id = blockchain_create_response.get('id')
+            if blockchain_tx_id:
+                # Try to update blockchain transaction (should fail)
+                success, fail_response = self.run_test(
+                    "Update Blockchain Transaction (Should Fail)",
+                    "PUT",
+                    f"transactions/{blockchain_tx_id}",
+                    400,  # Expecting 400 error
+                    data={"amount": 2.0}
+                )
+                
+                if success:
+                    print(f"✅ Correctly rejected update of blockchain transaction")
+                else:
+                    print(f"❌ Should have rejected blockchain transaction update")
+        
+        # 6. Test DELETE
         success, delete_response = self.run_test(
-            "Delete Fiat Transaction",
+            "Delete Crypto Transaction",
             "DELETE",
-            f"fiat-transactions/{transaction_id}",
+            f"transactions/{transaction_id}",
             200
         )
         
         if success:
-            print(f"✅ Deleted transaction successfully")
+            print(f"✅ Deleted crypto transaction successfully")
             
             # Verify deletion
             success, verify_delete_response = self.run_test(
-                "Verify Transaction Deletion",
+                "Verify Crypto Transaction Deletion",
                 "GET",
-                f"fiat-transactions?account_id={account_id}",
+                f"transactions?wallet_id={wallet_id}",
                 200
             )
             
@@ -272,9 +331,9 @@ class CryptoTrackAPITester:
                         break
                         
                 if not deleted_tx:
-                    self.log_test("Verify Transaction Deleted", True, "Transaction successfully removed from list")
+                    self.log_test("Verify Crypto Transaction Deleted", True, "Transaction successfully removed from list")
                 else:
-                    self.log_test("Verify Transaction Deleted", False, "Transaction still exists after deletion")
+                    self.log_test("Verify Crypto Transaction Deleted", False, "Transaction still exists after deletion")
         
         return True
 
