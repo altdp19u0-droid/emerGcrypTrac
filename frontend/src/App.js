@@ -2618,6 +2618,180 @@ const FiatPage = () => {
                   ) : <div className="empty-state-sm"><p>Aucune transaction</p></div>}
                 </CardContent>
               </Card>
+
+              {/* Dialog d'édition de transaction */}
+              <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
+                <DialogContent className="max-w-lg">
+                  <DialogHeader><DialogTitle>Modifier la Transaction</DialogTitle></DialogHeader>
+                  {editingTransaction && (
+                    <div className="space-y-4">
+                      {/* Type de transaction */}
+                      <div>
+                        <Label>Type de Transaction</Label>
+                        <Select value={editingTransaction.type} onValueChange={(v) => setEditingTransaction({...editingTransaction, type: v})}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="deposit">Dépôt (Entrée)</SelectItem>
+                            <SelectItem value="withdrawal">Retrait (Sortie)</SelectItem>
+                            <SelectItem value="crypto_buy">Achat Crypto</SelectItem>
+                            <SelectItem value="crypto_sell">Vente Crypto</SelectItem>
+                            <SelectItem value="transfer_in">Virement Entrant</SelectItem>
+                            <SelectItem value="transfer_out">Virement Sortant</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {/* Montant et Description */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>Montant ({selectedAccount?.currency || "EUR"})</Label>
+                          <Input 
+                            type="number" 
+                            value={editingTransaction.amount} 
+                            onChange={(e) => setEditingTransaction({...editingTransaction, amount: parseFloat(e.target.value) || 0})} 
+                            data-testid="edit-fiat-amount-input"
+                          />
+                        </div>
+                        <div>
+                          <Label>Description</Label>
+                          <Input 
+                            value={editingTransaction.description} 
+                            onChange={(e) => setEditingTransaction({...editingTransaction, description: e.target.value})} 
+                            data-testid="edit-fiat-description-input"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Source - affiché pour dépôts, ventes crypto, virements entrants */}
+                      {editNeedsSourceInput && (
+                        <div className="p-3 bg-zinc-800/50 rounded-lg space-y-3">
+                          <Label className="text-green-400">Origine (Source)</Label>
+                          <Select value={editingTransaction.source_type || "external"} onValueChange={(v) => setEditingTransaction({...editingTransaction, source_type: v, source_account_id: "", source_wallet_id: "", source_wallet_address: ""})}>
+                            <SelectTrigger><SelectValue placeholder="Type d'origine" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="external">Externe (Autre)</SelectItem>
+                              <SelectItem value="bank">Compte Fiat</SelectItem>
+                              <SelectItem value="wallet">Wallet Crypto</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          
+                          {editingTransaction.source_type === "bank" && (
+                            <Select value={editingTransaction.source_account_id || ""} onValueChange={(v) => setEditingTransaction({...editingTransaction, source_account_id: v})}>
+                              <SelectTrigger><SelectValue placeholder="Sélectionner le compte" /></SelectTrigger>
+                              <SelectContent>
+                                {accounts.filter(a => a.id !== selectedAccount?.id).map(a => (
+                                  <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                          
+                          {editingTransaction.source_type === "wallet" && (
+                            <>
+                              <Select value={editingTransaction.source_wallet_id || ""} onValueChange={(v) => {
+                                const wallet = wallets.find(w => w.id === v);
+                                setEditingTransaction({...editingTransaction, source_wallet_id: v, source_wallet_address: wallet?.address || ""});
+                              }}>
+                                <SelectTrigger><SelectValue placeholder="Sélectionner le wallet" /></SelectTrigger>
+                                <SelectContent>
+                                  {wallets.map(w => (
+                                    <SelectItem key={w.id} value={w.id}>{w.name} ({w.network})</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </>
+                          )}
+                          
+                          {editingTransaction.source_type === "external" && (
+                            <Input 
+                              value={editingTransaction.source_wallet_address || ""} 
+                              onChange={(e) => setEditingTransaction({...editingTransaction, source_wallet_address: e.target.value})}
+                              placeholder="Référence ou adresse externe (optionnel)"
+                            />
+                          )}
+                        </div>
+                      )}
+
+                      {/* Destination - affiché pour retraits, achats crypto, virements sortants */}
+                      {editNeedsDestInput && (
+                        <div className="p-3 bg-zinc-800/50 rounded-lg space-y-3">
+                          <Label className="text-red-400">Destination</Label>
+                          <Select value={editingTransaction.dest_type || "external"} onValueChange={(v) => setEditingTransaction({...editingTransaction, dest_type: v, dest_account_id: "", dest_wallet_id: "", dest_wallet_address: ""})}>
+                            <SelectTrigger><SelectValue placeholder="Type de destination" /></SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="external">Externe (Autre)</SelectItem>
+                              <SelectItem value="bank">Compte Fiat</SelectItem>
+                              <SelectItem value="wallet">Wallet Crypto</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          
+                          {editingTransaction.dest_type === "bank" && (
+                            <Select value={editingTransaction.dest_account_id || ""} onValueChange={(v) => setEditingTransaction({...editingTransaction, dest_account_id: v})}>
+                              <SelectTrigger><SelectValue placeholder="Sélectionner le compte" /></SelectTrigger>
+                              <SelectContent>
+                                {accounts.filter(a => a.id !== selectedAccount?.id).map(a => (
+                                  <SelectItem key={a.id} value={a.id}>{a.name} ({a.currency})</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          )}
+                          
+                          {editingTransaction.dest_type === "wallet" && (
+                            <>
+                              <Select value={editingTransaction.dest_wallet_id || ""} onValueChange={(v) => {
+                                const wallet = wallets.find(w => w.id === v);
+                                setEditingTransaction({...editingTransaction, dest_wallet_id: v, dest_wallet_address: wallet?.address || ""});
+                              }}>
+                                <SelectTrigger><SelectValue placeholder="Sélectionner le wallet" /></SelectTrigger>
+                                <SelectContent>
+                                  {wallets.map(w => (
+                                    <SelectItem key={w.id} value={w.id}>{w.name} ({w.network})</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
+                            </>
+                          )}
+                          
+                          {editingTransaction.dest_type === "external" && (
+                            <Input 
+                              value={editingTransaction.dest_wallet_address || ""} 
+                              onChange={(e) => setEditingTransaction({...editingTransaction, dest_wallet_address: e.target.value})}
+                              placeholder="Référence ou adresse externe (optionnel)"
+                            />
+                          )}
+                        </div>
+                      )}
+
+                      {/* Date et Heure */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <Label>Date</Label>
+                          <Input 
+                            type="date" 
+                            value={editingTransaction.date} 
+                            onChange={(e) => setEditingTransaction({...editingTransaction, date: e.target.value})}
+                            data-testid="edit-fiat-date-input"
+                          />
+                        </div>
+                        <div>
+                          <Label>Heure</Label>
+                          <Input 
+                            type="time" 
+                            value={editingTransaction.time} 
+                            onChange={(e) => setEditingTransaction({...editingTransaction, time: e.target.value})}
+                            data-testid="edit-fiat-time-input"
+                          />
+                        </div>
+                      </div>
+                      
+                      <div className="flex gap-2">
+                        <Button variant="outline" onClick={() => setEditDialogOpen(false)} className="flex-1">Annuler</Button>
+                        <Button onClick={handleUpdateTransaction} className="flex-1" data-testid="submit-edit-fiat-transaction-btn">Enregistrer</Button>
+                      </div>
+                    </div>
+                  )}
+                </DialogContent>
+              </Dialog>
             </>
           ) : <div className="empty-state"><DollarSign size={48} className="empty-icon" /><h3>Sélectionnez un compte</h3></div>}
         </div>
