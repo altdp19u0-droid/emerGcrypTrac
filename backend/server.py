@@ -2041,11 +2041,31 @@ async def get_positions(current_user: dict = Depends(get_current_user)):
     """Get all investment positions for user"""
     positions = await db.positions.find({"user_id": current_user["id"]}, {"_id": 0}).to_list(1000)
     
+    # Get all movements for this user to enrich positions
+    all_movements = await db.position_movements.find({"user_id": current_user["id"]}, {"_id": 0}).to_list(10000)
+    movements_by_position = {}
+    for mov in all_movements:
+        pos_id = mov.get("position_id")
+        if pos_id not in movements_by_position:
+            movements_by_position[pos_id] = []
+        movements_by_position[pos_id].append(mov)
+    
     # Calculate estimated earnings for each position
     for pos in positions:
         amount = pos.get("amount", 0)
         apy = pos.get("apy", 0)
         deposit_date_str = pos.get("deposit_date", "")
+        pos_id = pos.get("id")
+        
+        # Get movements for this position
+        pos_movements = movements_by_position.get(pos_id, [])
+        pos["realized_yield"] = sum(m.get("amount", 0) for m in pos_movements if m.get("movement_type") == "yield_realized")
+        pos["capital_withdrawn"] = sum(m.get("amount", 0) for m in pos_movements if m.get("movement_type") == "capital_withdrawal")
+        pos["total_loss"] = sum(m.get("amount", 0) for m in pos_movements if m.get("movement_type") == "impermanent_loss")
+        pos["movements_count"] = len(pos_movements)
+        
+        # Remaining capital = initial amount - withdrawn - loss
+        pos["remaining_capital"] = amount - pos["capital_withdrawn"] - pos["total_loss"]
         
         # Calculate days since deposit
         try:
@@ -2057,8 +2077,8 @@ async def get_positions(current_user: dict = Depends(get_current_user)):
             days_elapsed = (datetime.now(timezone.utc) - deposit_date).days
             # Only count positive days (past deposits)
             if days_elapsed > 0:
-                # Estimated earnings = amount * (apy/100) * (days/365)
-                pos["estimated_earnings"] = round(amount * (apy / 100) * (days_elapsed / 365), 2)
+                # Estimated earnings = remaining_capital * (apy/100) * (days/365)
+                pos["estimated_earnings"] = round(pos["remaining_capital"] * (apy / 100) * (days_elapsed / 365), 2)
                 pos["days_elapsed"] = days_elapsed
             else:
                 pos["estimated_earnings"] = 0
@@ -2066,6 +2086,9 @@ async def get_positions(current_user: dict = Depends(get_current_user)):
         except:
             pos["estimated_earnings"] = 0
             pos["days_elapsed"] = 0
+        
+        # Pending yield = estimated - already realized
+        pos["pending_yield"] = max(0, pos["estimated_earnings"] - pos["realized_yield"])
         
         # Check if locked
         unlock_date_str = pos.get("unlock_date")
@@ -2084,20 +2107,56 @@ async def get_positions(current_user: dict = Depends(get_current_user)):
         else:
             pos["is_locked"] = False
             pos["days_until_unlock"] = 0
+        
+        # Position status
+        if pos["total_loss"] > 0:
+            pos["status"] = "loss"
+        elif pos["capital_withdrawn"] >= amount:
+            pos["status"] = "closed"
+        elif pos["is_locked"]:
+            pos["status"] = "locked"
+        else:
+            pos["status"] = "active"
     
     # Calculate totals by asset
     totals_by_asset = {}
     for pos in positions:
         asset = pos.get("asset", "UNKNOWN")
         if asset not in totals_by_asset:
-            totals_by_asset[asset] = {"amount": 0, "estimated_earnings": 0}
+            totals_by_asset[asset] = {
+                "amount": 0, 
+                "estimated_earnings": 0, 
+                "realized_yield": 0,
+                "capital_withdrawn": 0,
+                "total_loss": 0,
+                "remaining_capital": 0
+            }
         totals_by_asset[asset]["amount"] += pos.get("amount", 0)
         totals_by_asset[asset]["estimated_earnings"] += pos.get("estimated_earnings", 0)
+        totals_by_asset[asset]["realized_yield"] += pos.get("realized_yield", 0)
+        totals_by_asset[asset]["capital_withdrawn"] += pos.get("capital_withdrawn", 0)
+        totals_by_asset[asset]["total_loss"] += pos.get("total_loss", 0)
+        totals_by_asset[asset]["remaining_capital"] += pos.get("remaining_capital", 0)
+    
+    # Global totals
+    total_invested = sum(p.get("amount", 0) for p in positions)
+    total_realized_yield = sum(p.get("realized_yield", 0) for p in positions)
+    total_capital_withdrawn = sum(p.get("capital_withdrawn", 0) for p in positions)
+    total_loss = sum(p.get("total_loss", 0) for p in positions)
+    total_estimated = sum(p.get("estimated_earnings", 0) for p in positions)
     
     return {
         "positions": positions,
         "totals_by_asset": totals_by_asset,
-        "total_positions": len(positions)
+        "total_positions": len(positions),
+        "global_totals": {
+            "total_invested": total_invested,
+            "total_realized_yield": total_realized_yield,
+            "total_capital_withdrawn": total_capital_withdrawn,
+            "total_loss": total_loss,
+            "total_estimated_earnings": total_estimated,
+            "remaining_capital": total_invested - total_capital_withdrawn - total_loss
+        }
     }
 
 @api_router.put("/positions/{position_id}")
