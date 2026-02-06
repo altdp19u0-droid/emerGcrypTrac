@@ -1992,6 +1992,94 @@ async def delete_fiat_transaction(tx_id: str, current_user: dict = Depends(get_c
     
     return {"message": "Transaction deleted", "new_balance": new_balance if account else None}
 
+# ==================== POSITIONS/INVESTMENTS ENDPOINTS ====================
+
+@api_router.post("/positions", response_model=dict)
+async def create_position(position: PositionCreate, current_user: dict = Depends(get_current_user)):
+    """Create a new investment position"""
+    pos_dict = position.model_dump()
+    pos_dict["deposit_date"] = pos_dict.get("deposit_date") or datetime.now(timezone.utc).isoformat()
+    pos = Position(user_id=current_user["id"], **pos_dict)
+    doc = pos.model_dump()
+    await db.positions.insert_one(doc)
+    return {"id": pos.id, "message": "Position created"}
+
+@api_router.get("/positions")
+async def get_positions(current_user: dict = Depends(get_current_user)):
+    """Get all investment positions for user"""
+    positions = await db.positions.find({"user_id": current_user["id"]}, {"_id": 0}).to_list(1000)
+    
+    # Calculate estimated earnings for each position
+    for pos in positions:
+        amount = pos.get("amount", 0)
+        apy = pos.get("apy", 0)
+        deposit_date_str = pos.get("deposit_date", "")
+        
+        # Calculate days since deposit
+        try:
+            deposit_date = datetime.fromisoformat(deposit_date_str.replace("Z", "+00:00"))
+            days_elapsed = (datetime.now(timezone.utc) - deposit_date).days
+            # Estimated earnings = amount * (apy/100) * (days/365)
+            pos["estimated_earnings"] = round(amount * (apy / 100) * (days_elapsed / 365), 2)
+            pos["days_elapsed"] = days_elapsed
+        except:
+            pos["estimated_earnings"] = 0
+            pos["days_elapsed"] = 0
+        
+        # Check if locked
+        unlock_date_str = pos.get("unlock_date")
+        if unlock_date_str:
+            try:
+                unlock_date = datetime.fromisoformat(unlock_date_str.replace("Z", "+00:00"))
+                pos["is_locked"] = datetime.now(timezone.utc) < unlock_date
+                pos["days_until_unlock"] = max(0, (unlock_date - datetime.now(timezone.utc)).days)
+            except:
+                pos["is_locked"] = False
+                pos["days_until_unlock"] = 0
+        else:
+            pos["is_locked"] = False
+            pos["days_until_unlock"] = 0
+    
+    # Calculate totals by asset
+    totals_by_asset = {}
+    for pos in positions:
+        asset = pos.get("asset", "UNKNOWN")
+        if asset not in totals_by_asset:
+            totals_by_asset[asset] = {"amount": 0, "estimated_earnings": 0}
+        totals_by_asset[asset]["amount"] += pos.get("amount", 0)
+        totals_by_asset[asset]["estimated_earnings"] += pos.get("estimated_earnings", 0)
+    
+    return {
+        "positions": positions,
+        "totals_by_asset": totals_by_asset,
+        "total_positions": len(positions)
+    }
+
+@api_router.put("/positions/{position_id}")
+async def update_position(position_id: str, pos_data: PositionUpdate, current_user: dict = Depends(get_current_user)):
+    """Update an existing position"""
+    existing = await db.positions.find_one({"id": position_id, "user_id": current_user["id"]}, {"_id": 0})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Position not found")
+    
+    update_data = {k: v for k, v in pos_data.model_dump().items() if v is not None}
+    if not update_data:
+        return {"message": "No changes provided", "id": position_id}
+    
+    await db.positions.update_one(
+        {"id": position_id, "user_id": current_user["id"]},
+        {"$set": update_data}
+    )
+    return {"message": "Position updated", "id": position_id}
+
+@api_router.delete("/positions/{position_id}")
+async def delete_position(position_id: str, current_user: dict = Depends(get_current_user)):
+    """Delete a position"""
+    result = await db.positions.delete_one({"id": position_id, "user_id": current_user["id"]})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Position not found")
+    return {"message": "Position deleted"}
+
 # ==================== PORTFOLIO ENDPOINTS ====================
 
 @api_router.get("/portfolio/summary")
