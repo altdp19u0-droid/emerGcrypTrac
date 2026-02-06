@@ -2030,7 +2030,11 @@ async def get_positions(current_user: dict = Depends(get_current_user)):
         unlock_date_str = pos.get("unlock_date")
         if unlock_date_str:
             try:
-                unlock_date = datetime.fromisoformat(unlock_date_str.replace("Z", "+00:00"))
+                # Parse date string (might be just date or full ISO)
+                if "T" in unlock_date_str:
+                    unlock_date = datetime.fromisoformat(unlock_date_str.replace("Z", "+00:00"))
+                else:
+                    unlock_date = datetime.strptime(unlock_date_str, "%Y-%m-%d").replace(tzinfo=timezone.utc)
                 pos["is_locked"] = datetime.now(timezone.utc) < unlock_date
                 pos["days_until_unlock"] = max(0, (unlock_date - datetime.now(timezone.utc)).days)
             except:
