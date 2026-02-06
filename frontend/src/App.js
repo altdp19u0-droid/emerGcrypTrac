@@ -2567,7 +2567,7 @@ const PositionsPage = () => {
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
@@ -2575,8 +2575,9 @@ const PositionsPage = () => {
                 <PiggyBank size={24} className="text-blue-400" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Total Investi</p>
-                <p className="text-2xl font-bold">{totalValue.toFixed(2)}</p>
+                <p className="text-sm text-muted-foreground">Capital Investi</p>
+                <p className="text-2xl font-bold">{(globalTotals.total_invested || 0).toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground">Restant: {(globalTotals.remaining_capital || 0).toFixed(2)}</p>
               </div>
             </div>
           </CardContent>
@@ -2588,8 +2589,9 @@ const PositionsPage = () => {
                 <TrendingUp size={24} className="text-green-400" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Gains Estimés</p>
-                <p className="text-2xl font-bold text-green-400">+{totalEarnings.toFixed(2)}</p>
+                <p className="text-sm text-muted-foreground">Rendement Réalisé</p>
+                <p className="text-2xl font-bold text-green-400">+{(globalTotals.total_realized_yield || 0).toFixed(2)}</p>
+                <p className="text-xs text-muted-foreground">Estimé: +{(globalTotals.total_estimated_earnings || 0).toFixed(2)}</p>
               </div>
             </div>
           </CardContent>
@@ -2597,12 +2599,25 @@ const PositionsPage = () => {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center gap-3">
-              <div className="p-3 rounded-full bg-purple-500/20">
-                <FileText size={24} className="text-purple-400" />
+              <div className="p-3 rounded-full bg-amber-500/20">
+                <DollarSign size={24} className="text-amber-400" />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">Positions Actives</p>
-                <p className="text-2xl font-bold">{positions.length}</p>
+                <p className="text-sm text-muted-foreground">Capital Retiré</p>
+                <p className="text-2xl font-bold text-amber-400">{(globalTotals.total_capital_withdrawn || 0).toFixed(2)}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="pt-6">
+            <div className="flex items-center gap-3">
+              <div className="p-3 rounded-full bg-red-500/20">
+                <AlertTriangle size={24} className="text-red-400" />
+              </div>
+              <div>
+                <p className="text-sm text-muted-foreground">Pertes</p>
+                <p className="text-2xl font-bold text-red-400">{(globalTotals.total_loss || 0).toFixed(2)}</p>
               </div>
             </div>
           </CardContent>
