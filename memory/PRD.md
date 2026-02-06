@@ -3,24 +3,23 @@
 ## Original Problem Statement
 Application de suivi de portfolio crypto avec gestion des comptes Fiat intégrée.
 
-## Améliorations Fiat (06/02/2026)
+## Mise à jour (06/02/2026)
 
-### Nouvelle Architecture Fiat
-1. **Origine/Destination pour chaque transaction**
-   - Source : Banque fiat (compte_id) | Wallet crypto (wallet_id + adresse) | Externe
-   - Destination : Banque fiat | Wallet crypto | Externe
-   - Champs: source_type, source_account_id, source_wallet_id, source_wallet_address, source_name
-   - Champs: dest_type, dest_account_id, dest_wallet_id, dest_wallet_address, dest_name
+### Fonctionnalités Fiat
+1. **Comptes Fiat avec format comptable**
+   - Colonnes Débit/Crédit/Solde courant
+   - Origine/Destination pour chaque transaction
 
-2. **Format comptable**
-   - Colonne Débit (montant négatif)
-   - Colonne Crédit (montant positif)
-   - Colonne Solde courant (running_balance)
+2. **NOUVEAU: Modification des transactions** ✅
+   - Bouton Modifier (crayon) dans colonne Actions
+   - Dialog d'édition pré-rempli
+   - Modification de: Type, Montant, Description, Date/Heure, Origine, Destination
+   - Mise à jour automatique du solde
 
-3. **Intégration page Transactions**
-   - Paramètre `include_fiat=true` pour combiner crypto + fiat
-   - Colonne "Catégorie" (Fiat/Crypto)
-   - Filtre par comptes fiat
+3. **NOUVEAU: Suppression des transactions** ✅
+   - Bouton Supprimer (poubelle) dans colonne Actions
+   - Confirmation avant suppression
+   - Ajustement automatique du solde
 
 ## Stack Technique
 - **Frontend**: React.js + Tailwind CSS + shadcn/ui + Recharts
@@ -33,22 +32,26 @@ Application de suivi de portfolio crypto avec gestion des comptes Fiat intégré
 - ✅ Dashboard portfolio multi-chaînes
 - ✅ Wallets (ETH, Polygon, Arbitrum, Base, Optimism)
 - ✅ Transactions crypto avec sync blockchain
-- ✅ **Comptes Fiat avec origine/destination**
-- ✅ **Tableau comptable Débit/Crédit/Solde**
-- ✅ **Transactions Fiat dans page Transactions**
+- ✅ Comptes Fiat avec origine/destination
+- ✅ Tableau comptable Débit/Crédit/Solde
+- ✅ Transactions Fiat dans page Transactions
+- ✅ **Modification des transactions Fiat**
+- ✅ **Suppression des transactions Fiat**
 - ✅ P&L Calculator
 - ✅ Export PDF/CSV
 
 ## Compte de Test
 - **Username**: fiatdemo
 - **Password**: FiatDemo123
-- **Compte Fiat**: "Banque Principale" avec 3000€
+- **Compte Fiat**: "Banque Principale" avec ~3000€
 
 ## Backlog
 ### P1
+- Historique des modifications (audit trail)
 - Rapport de rapprochement bancaire Fiat/Crypto
 - Alertes de prix
 
 ### P2
 - Support nouvelles chaînes
 - Intégration exchanges
+- Fonction Undo après suppression
