@@ -2459,10 +2459,6 @@ const PositionsPage = () => {
     return pt ? pt.label : value;
   };
 
-  // Calculate total value and earnings
-  const totalValue = positions.reduce((sum, p) => sum + (p.amount || 0), 0);
-  const totalEarnings = positions.reduce((sum, p) => sum + (p.estimated_earnings || 0), 0);
-
   if (loading) return <div className="page-content"><RefreshCw className="animate-spin" /></div>;
 
   return (
