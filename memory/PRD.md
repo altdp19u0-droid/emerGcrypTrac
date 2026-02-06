@@ -39,6 +39,11 @@ Application de suivi de portfolio crypto avec gestion des comptes Fiat intégré
 - ✅ P&L Calculator
 - ✅ Export PDF/CSV
 
+## Compte de Test
+- **Username**: fiatdemo
+- **Password**: FiatDemo123
+- **Compte Fiat**: "Banque Principale" avec 3000€
+
 ## Backlog
 ### P1
 - Rapport de rapprochement bancaire Fiat/Crypto
