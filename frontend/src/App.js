@@ -2574,6 +2574,7 @@ const FiatPage = () => {
                                   <SelectContent>
                                     <SelectItem value="external">Externe (Autre)</SelectItem>
                                     <SelectItem value="bank">Compte Fiat</SelectItem>
+                                    <SelectItem value="exchange">Exchange (Kraken, Binance...)</SelectItem>
                                     <SelectItem value="wallet">Wallet Crypto</SelectItem>
                                   </SelectContent>
                                 </Select>
