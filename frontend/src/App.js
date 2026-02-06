@@ -2218,6 +2218,75 @@ const FiatPage = () => {
     }
   };
 
+  // Ouvrir le dialog d'édition avec les données de la transaction
+  const openEditDialog = (tx) => {
+    const txDate = new Date(tx.date);
+    setEditingTransaction({
+      ...tx,
+      date: txDate.toISOString().split("T")[0],
+      time: txDate.toTimeString().slice(0, 5),
+      amount: Math.abs(tx.amount) // Toujours positif dans le formulaire
+    });
+    setEditDialogOpen(true);
+  };
+
+  // Mettre à jour une transaction
+  const handleUpdateTransaction = async () => {
+    if (!editingTransaction) return;
+    try {
+      // Combine date and time
+      const dateTime = editingTransaction.time 
+        ? `${editingTransaction.date}T${editingTransaction.time}:00`
+        : editingTransaction.date;
+      
+      // Adjust amount based on transaction type
+      let finalAmount = Math.abs(editingTransaction.amount);
+      if (["withdrawal", "crypto_buy", "transfer_out"].includes(editingTransaction.type)) {
+        finalAmount = -finalAmount;
+      }
+      
+      await api.put(`/fiat-transactions/${editingTransaction.id}`, {
+        type: editingTransaction.type,
+        amount: finalAmount,
+        description: editingTransaction.description,
+        date: dateTime,
+        source_type: editingTransaction.source_type,
+        source_account_id: editingTransaction.source_account_id || null,
+        source_wallet_id: editingTransaction.source_wallet_id || null,
+        source_wallet_address: editingTransaction.source_wallet_address || null,
+        dest_type: editingTransaction.dest_type,
+        dest_account_id: editingTransaction.dest_account_id || null,
+        dest_wallet_id: editingTransaction.dest_wallet_id || null,
+        dest_wallet_address: editingTransaction.dest_wallet_address || null
+      });
+      toast.success("Transaction modifiée");
+      setEditDialogOpen(false);
+      setEditingTransaction(null);
+      fetchAccounts();
+      fetchTransactions(selectedAccount.id);
+    } catch (error) {
+      toast.error("Erreur lors de la modification");
+    }
+  };
+
+  // Supprimer une transaction
+  const handleDeleteTransaction = async (txId) => {
+    if (window.confirm("Supprimer cette transaction ? Le solde du compte sera ajusté.")) {
+      try {
+        await api.delete(`/fiat-transactions/${txId}`);
+        toast.success("Transaction supprimée");
+        fetchAccounts();
+        fetchTransactions(selectedAccount.id);
+      } catch (error) {
+        toast.error("Erreur lors de la suppression");
+      }
+    }
+  };
+
+  // Determine if we need source or destination input based on transaction type (for edit dialog)
+  const editNeedsSourceInput = editingTransaction && ["deposit", "crypto_sell", "transfer_in"].includes(editingTransaction.type);
+  const editNeedsDestInput = editingTransaction && ["withdrawal", "crypto_buy", "transfer_out"].includes(editingTransaction.type);
+
   // Determine if we need source or destination input based on transaction type
   const needsSourceInput = ["deposit", "crypto_sell", "transfer_in"].includes(newTransaction.type);
   const needsDestInput = ["withdrawal", "crypto_buy", "transfer_out"].includes(newTransaction.type);
