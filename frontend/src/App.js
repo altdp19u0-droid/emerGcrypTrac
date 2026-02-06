@@ -2649,23 +2649,24 @@ const PositionsPage = () => {
         <CardHeader><CardTitle className="card-title-sm">Vos Positions</CardTitle></CardHeader>
         <CardContent>
           {positions.length > 0 ? (
-            <ScrollArea className="h-[400px]">
+            <ScrollArea className="h-[450px]">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Plateforme</TableHead>
                     <TableHead>Type</TableHead>
                     <TableHead>Asset</TableHead>
-                    <TableHead className="text-right">Montant</TableHead>
+                    <TableHead className="text-right">Capital</TableHead>
                     <TableHead className="text-right">APY</TableHead>
-                    <TableHead className="text-right">Gains Estimés</TableHead>
+                    <TableHead className="text-right text-green-400">Réalisé</TableHead>
+                    <TableHead className="text-right">En Attente</TableHead>
                     <TableHead>Statut</TableHead>
-                    <TableHead className="w-[80px]">Actions</TableHead>
+                    <TableHead className="w-[120px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {positions.map((pos) => (
-                    <TableRow key={pos.id}>
+                    <TableRow key={pos.id} className={pos.status === "loss" ? "bg-red-500/10" : pos.status === "closed" ? "bg-zinc-500/10" : ""}>
                       <TableCell className="font-medium">{pos.platform}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{getProductTypeLabel(pos.product_type)}</Badge>
