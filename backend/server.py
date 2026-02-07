@@ -1247,13 +1247,14 @@ async def sync_address_on_chain(request: SyncChainRequest, current_user: dict = 
                                 price_eur=price_eur,
                                 value_usd=amount * price_usd,
                                 value_eur=amount * price_eur,
-                                fees=0,
+                                fees=0,  # Gas fees not available in token-transfers API
                                 wallet_id=wallet_id,
                                 wallet_name=wallet_name_full,
                                 source=f"blockchain_{network.lower()}",
                                 date=tx_date.strftime("%Y-%m-%d"),
                                 tx_hash=tx_hash,
-                                counterparty_wallet=from_addr.get("hash", "") if is_incoming else to_addr.get("hash", "")
+                                counterparty_wallet=from_addr.get("hash", "") if is_incoming else to_addr.get("hash", ""),
+                                notes="Frais gas non disponibles via API token-transfers"
                             )
                             
                             await db.transactions.insert_one(transaction.model_dump())
