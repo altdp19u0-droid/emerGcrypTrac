@@ -1536,11 +1536,67 @@ async def remove_hidden_token(symbol: str, current_user: dict = Depends(get_curr
 
 @api_router.post("/transactions", response_model=dict)
 async def create_transaction(tx_data: TransactionCreate, current_user: dict = Depends(get_current_user)):
-    """Create a new transaction"""
-    tx = Transaction(user_id=current_user["id"], **tx_data.model_dump())
+    """Create a new transaction with optional Crypto ↔ Crypto interdependence"""
+    tx_dict = tx_data.model_dump()
+    
+    # Remove non-model fields
+    create_counterpart_tx = tx_dict.pop("create_counterpart_tx", False)
+    target_wallet_id = tx_dict.pop("target_wallet_id", None)
+    
+    tx = Transaction(user_id=current_user["id"], **tx_dict)
+    
+    linked_tx_id = None
+    linked_tx_message = ""
+    
+    # Interdépendance Crypto ↔ Crypto: Créer la transaction contrepartie
+    if create_counterpart_tx and target_wallet_id and tx_data.type in ["Transfer Out", "Transfer In"]:
+        # Vérifier que le wallet destinataire existe
+        target_wallet = await db.wallets.find_one({"id": target_wallet_id, "user_id": current_user["id"]}, {"_id": 0})
+        if target_wallet:
+            # Déterminer le type de contrepartie
+            if tx_data.type == "Transfer Out":
+                counterpart_type = "Transfer In"
+                counterpart_amount = abs(tx_data.amount)
+            else:  # Transfer In
+                counterpart_type = "Transfer Out"
+                counterpart_amount = -abs(tx_data.amount)
+            
+            # Créer la transaction contrepartie
+            counterpart_tx = Transaction(
+                user_id=current_user["id"],
+                wallet_id=target_wallet_id,
+                wallet_name=target_wallet.get("name", ""),
+                type=counterpart_type,
+                asset=tx_data.asset,
+                amount=counterpart_amount,
+                price_usd=tx_data.price_usd,
+                price_eur=tx_data.price_eur,
+                value_usd=tx_data.value_usd,
+                value_eur=tx_data.value_eur,
+                fees=0,  # Pas de frais sur la contrepartie
+                fees_currency=tx_data.fees_currency,
+                date=tx_data.date,
+                tx_hash=tx_data.tx_hash or "",
+                notes=f"Contrepartie de transfert depuis {tx_data.wallet_name}",
+                linked_tx_id=tx.id  # Lier à la transaction principale
+            )
+            counterpart_doc = counterpart_tx.model_dump()
+            await db.transactions.insert_one(counterpart_doc)
+            linked_tx_id = counterpart_tx.id
+            linked_tx_message = f" + transaction contrepartie créée dans {target_wallet.get('name', 'wallet')}"
+            
+            # Mettre à jour la transaction principale avec l'ID de la contrepartie
+            tx_dict["linked_tx_id"] = linked_tx_id
+            tx = Transaction(user_id=current_user["id"], **tx_dict)
+    
     doc = tx.model_dump()
     await db.transactions.insert_one(doc)
-    return {"id": tx.id, "message": "Transaction created"}
+    
+    return {
+        "id": tx.id, 
+        "message": f"Transaction créée{linked_tx_message}",
+        "linked_tx_id": linked_tx_id
+    }
 
 @api_router.get("/transactions")
 async def get_transactions(
