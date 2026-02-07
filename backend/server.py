@@ -2590,6 +2590,11 @@ async def create_position_movement(movement: PositionMovementCreate, current_use
     create_deposit_tx = mov_dict.pop("create_deposit_tx", False)
     target_wallet_id = mov_dict.get("target_wallet_id")
     
+    # Ignore "none" values
+    if target_wallet_id == "none":
+        target_wallet_id = None
+        mov_dict["target_wallet_id"] = None
+    
     linked_tx_id = None
     linked_tx_message = ""
     
