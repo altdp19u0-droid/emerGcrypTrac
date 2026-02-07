@@ -3720,8 +3720,9 @@ const FiatPage = () => {
   const editNeedsDestInput = editingTransaction && ["withdrawal", "crypto_buy", "transfer_out"].includes(editingTransaction.type);
 
   // Determine if we need source or destination input based on transaction type
-  const needsSourceInput = ["deposit", "crypto_sell", "transfer_in"].includes(newTransaction.type);
-  const needsDestInput = ["withdrawal", "crypto_buy", "transfer_out"].includes(newTransaction.type);
+  // Exclude crypto_buy/crypto_sell as they have their own dedicated section
+  const needsSourceInput = ["deposit", "transfer_in"].includes(newTransaction.type);
+  const needsDestInput = ["withdrawal", "transfer_out"].includes(newTransaction.type);
 
   return (
     <div className="page-content" data-testid="fiat-page">
