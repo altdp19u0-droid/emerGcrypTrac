@@ -1587,6 +1587,44 @@ const TransactionsPage = () => {
                   </div>
                 </div>
                 
+                {/* Interdépendance Crypto ↔ Crypto pour les transferts */}
+                {(newTransaction.type === "Transfer Out" || newTransaction.type === "Transfer In") && (
+                  <div className="border-t pt-4 mt-2">
+                    <Label className="text-sm text-muted-foreground mb-2 block">Interdépendance - Transfert Interne (optionnel)</Label>
+                    <div className="space-y-3">
+                      <div>
+                        <Label>Wallet {newTransaction.type === "Transfer Out" ? "Destinataire" : "Source"}</Label>
+                        <Select 
+                          value={newTransaction.target_wallet_id} 
+                          onValueChange={(v) => setNewTransaction({...newTransaction, target_wallet_id: v})}
+                        >
+                          <SelectTrigger><SelectValue placeholder="Sélectionner un wallet interne..." /></SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="">Aucun (wallet externe)</SelectItem>
+                            {wallets.filter(w => w.id !== newTransaction.wallet_id).map(w => (
+                              <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      {newTransaction.target_wallet_id && (
+                        <div className="flex items-center space-x-2">
+                          <input 
+                            type="checkbox" 
+                            id="create_counterpart_tx"
+                            checked={newTransaction.create_counterpart_tx}
+                            onChange={(e) => setNewTransaction({...newTransaction, create_counterpart_tx: e.target.checked})}
+                            className="rounded"
+                          />
+                          <Label htmlFor="create_counterpart_tx" className="text-sm cursor-pointer">
+                            Créer automatiquement la transaction contrepartie ({newTransaction.type === "Transfer Out" ? "Transfer In" : "Transfer Out"})
+                          </Label>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+                
                 <Button onClick={handleCreateTransaction} className="w-full" data-testid="submit-transaction-btn">
                   Add Transaction
                 </Button>
