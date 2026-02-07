@@ -2617,14 +2617,17 @@ async def get_portfolio_allocation(current_user: dict = Depends(get_current_user
 @api_router.get("/portfolio/pnl")
 async def get_pnl_report(current_user: dict = Depends(get_current_user)):
     """Calculate P&L using FIFO method in EUR (excluding SPAM transactions)"""
-    # Exclude spam transactions from P&L calculations
+    # Exclude spam transactions from P&L calculations - stricter filter
     transactions = await db.transactions.find(
         {
             "user_id": current_user["id"],
-            "$or": [{"is_spam": False}, {"is_spam": {"$exists": False}}]
+            "is_spam": {"$ne": True}  # Exclude is_spam=True, include False and undefined
         },
         {"_id": 0}
     ).sort("date", 1).to_list(10000)
+    
+    # Filter again in Python to be absolutely sure (belt and suspenders)
+    transactions = [tx for tx in transactions if tx.get("is_spam") != True]
     
     # Group by asset
     asset_txs: Dict[str, List[dict]] = {}
