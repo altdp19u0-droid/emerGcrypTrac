@@ -1080,14 +1080,15 @@ button[role="combobox"] span {
   font-size: 28px;
   font-weight: 700;
   font-family: 'JetBrains Mono', monospace;
+  color: #e4e4e7; /* zinc-200 fallback */
 }
 
 .pnl-positive .pnl-value {
-  color: var(--accent-green);
+  color: var(--accent-green, #4ade80);
 }
 
 .pnl-negative .pnl-value {
-  color: var(--accent-red);
+  color: var(--accent-red, #f87171);
 }
 
 /* ==================== REPORTS PAGE ==================== */
