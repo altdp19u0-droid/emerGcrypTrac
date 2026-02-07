@@ -1920,6 +1920,42 @@ const TransactionsPage = () => {
                       {tx.is_spam && <Badge variant="destructive" className="text-xs">SPAM</Badge>}
                     </div>
                   </TableCell>
+                  {/* Libellé (income_category) - seulement pour crypto */}
+                  <TableCell>
+                    {tx.tx_category === "crypto" ? (
+                      <Select 
+                        value={tx.income_category || ""} 
+                        onValueChange={async (value) => {
+                          try {
+                            await api.patch(`/transactions/${tx.id}/category`, { income_category: value || null });
+                            toast.success("Catégorie mise à jour");
+                            // Refresh transactions
+                            fetchTransactions();
+                          } catch (error) {
+                            toast.error("Erreur lors de la mise à jour");
+                          }
+                        }}
+                      >
+                        <SelectTrigger className="h-7 text-xs w-[100px] bg-transparent border-zinc-700">
+                          <SelectValue placeholder="-" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="">Aucun</SelectItem>
+                          <SelectItem value="interest" className="text-green-400">💰 Intérêts</SelectItem>
+                          <SelectItem value="yield" className="text-green-400">📈 Rendement</SelectItem>
+                          <SelectItem value="airdrop" className="text-cyan-400">🎁 Airdrop</SelectItem>
+                          <SelectItem value="reward" className="text-yellow-400">⭐ Récompense</SelectItem>
+                          <SelectItem value="cashback" className="text-purple-400">💸 Cashback</SelectItem>
+                          <SelectItem value="fee" className="text-red-400">💳 Frais</SelectItem>
+                          <SelectItem value="gas" className="text-orange-400">⛽ Gas</SelectItem>
+                          <SelectItem value="subscription" className="text-blue-400">📅 Abonnement</SelectItem>
+                          <SelectItem value="payment" className="text-red-400">💳 Paiement</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <span className="text-zinc-500 text-xs">-</span>
+                    )}
+                  </TableCell>
                   {/* Asset */}
                   <TableCell className="font-medium">
                     {tx.tx_category === "fiat" ? tx.currency || tx.asset : tx.asset}
