@@ -42,6 +42,11 @@ Application de suivi de portefeuille crypto-fiat "emerGcrypTrac" avec les foncti
 - [x] Fixed P&L table text visibility
 - [x] Fixed Total Fees color visibility (orange-500)
 
+### Spam Cleanup (Completed - 2026-02-07)
+- [x] Marked 76+ transactions as spam (fake USDC, scam tokens)
+- [x] P&L report now shows only 10 legitimate assets
+- [x] Spam excluded: UЅDС, ꓴꓢꓓС, USDⅭ, openAI, GPT, BSX, Meow, SHIT, UNKNOWN, KIMO, DAS, MIM, KEKIUS, GUYS, DKP, BUSD, FUN, SENT, HORSE, NEXFI, AZTEC, DROID, EPSTEIN, FT
+
 ## Pending Tasks
 
 ### P0 - Critical
