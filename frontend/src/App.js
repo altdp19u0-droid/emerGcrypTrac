@@ -2379,8 +2379,10 @@ const PositionsPage = () => {
     { value: "other", label: "Autre" }
   ];
   const movementTypes = [
+    { value: "capital_addition", label: "Ajout de Capital", color: "text-blue-400" },
     { value: "yield_realized", label: "Rendement Réalisé", color: "text-green-400" },
-    { value: "capital_withdrawal", label: "Retrait de Capital", color: "text-blue-400" },
+    { value: "capital_withdrawal", label: "Retrait de Capital", color: "text-amber-400" },
+    { value: "capital_deposit", label: "Dépôt Capital (auto)", color: "text-purple-400" },
     { value: "impermanent_loss", label: "Perte (Rupture Contrat)", color: "text-red-400" }
   ];
   const assets = ["EURA", "EURC", "ZCHF", "USDC", "USDT", "ETH", "BTC", "EUR", "USD", "CHF"];
