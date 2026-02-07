@@ -1924,10 +1924,11 @@ const TransactionsPage = () => {
                   <TableCell>
                     {tx.tx_category === "crypto" ? (
                       <Select 
-                        value={tx.income_category || ""} 
+                        value={tx.income_category || "none"} 
                         onValueChange={async (value) => {
                           try {
-                            await api.patch(`/transactions/${tx.id}/category`, { income_category: value || null });
+                            const categoryValue = value === "none" ? null : value;
+                            await api.patch(`/transactions/${tx.id}/category`, { income_category: categoryValue });
                             toast.success("Catégorie mise à jour");
                             // Refresh transactions
                             fetchTransactions();
@@ -1940,7 +1941,7 @@ const TransactionsPage = () => {
                           <SelectValue placeholder="-" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="">Aucun</SelectItem>
+                          <SelectItem value="none">Aucun</SelectItem>
                           <SelectItem value="interest" className="text-green-400">💰 Intérêts</SelectItem>
                           <SelectItem value="yield" className="text-green-400">📈 Rendement</SelectItem>
                           <SelectItem value="airdrop" className="text-cyan-400">🎁 Airdrop</SelectItem>
