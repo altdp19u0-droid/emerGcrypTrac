@@ -1310,6 +1310,41 @@ const TransactionsPage = () => {
     }
   };
 
+  // Export transactions to CSV
+  const handleExportTransactionsCSV = () => {
+    if (transactions.length === 0) {
+      toast.error("Aucune transaction à exporter");
+      return;
+    }
+    
+    const headers = ["Date", "Type", "Asset", "Amount", "Price EUR", "Value EUR", "Fees", "Fees Currency", "Wallet", "Source", "Counterparty", "TX Hash", "Is Spam"];
+    const rows = transactions.map(tx => [
+      tx.date,
+      tx.type,
+      tx.asset,
+      tx.amount,
+      tx.price_eur,
+      tx.value_eur,
+      tx.fees || 0,
+      tx.fees_currency || "EUR",
+      tx.wallet_name,
+      tx.source,
+      tx.counterparty_wallet || "",
+      tx.tx_hash || "",
+      tx.is_spam ? "Yes" : "No"
+    ]);
+    
+    const csvContent = [headers.join(","), ...rows.map(r => r.map(v => `"${v}"`).join(","))].join("\n");
+    const blob = new Blob([csvContent], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `transactions_export_${new Date().toISOString().split("T")[0]}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    toast.success("Export CSV téléchargé");
+  };
+
   const toggleSpam = async (txId) => {
     try {
       const response = await api.patch(`/transactions/${txId}/spam`);
