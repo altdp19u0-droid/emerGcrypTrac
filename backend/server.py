@@ -1543,6 +1543,10 @@ async def create_transaction(tx_data: TransactionCreate, current_user: dict = De
     create_counterpart_tx = tx_dict.pop("create_counterpart_tx", False)
     target_wallet_id = tx_dict.pop("target_wallet_id", None)
     
+    # Ignore "none" values
+    if target_wallet_id == "none":
+        target_wallet_id = None
+    
     tx = Transaction(user_id=current_user["id"], **tx_dict)
     
     linked_tx_id = None
