@@ -2009,7 +2009,58 @@ const TransactionsPage = () => {
                       // Pour crypto: Source = counterparty si Transfer In/Deposit/Buy, sinon wallet_name
                       ["Transfer In", "Deposit", "Buy"].includes(tx.type) ? (
                         tx.counterparty_wallet ? (
-                          <span className="font-mono text-xs text-zinc-400">{tx.counterparty_wallet.substring(0, 10)}...</span>
+                          <TooltipProvider>
+                            <Tooltip delayDuration={300}>
+                              <TooltipTrigger asChild>
+                                <span>
+                                  <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                      <button 
+                                        className={`counterparty-cell cursor-pointer hover:opacity-80 px-2 py-1 rounded ${
+                                          getAddressColor(tx.counterparty_wallet) === "trusted" 
+                                            ? "bg-green-500/20 text-green-400 border border-green-500/50" 
+                                            : getAddressColor(tx.counterparty_wallet) === "suspicious"
+                                            ? "bg-yellow-500/20 text-yellow-400 border border-yellow-500/50"
+                                            : "text-foreground"
+                                        }`}
+                                      >
+                                        {getAddressColor(tx.counterparty_wallet) === "trusted" && <Shield size={12} className="inline mr-1" />}
+                                        {getAddressColor(tx.counterparty_wallet) === "suspicious" && <AlertTriangle size={12} className="inline mr-1" />}
+                                        {tx.counterparty_wallet.substring(0, 10)}...
+                                      </button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent style={{ backgroundColor: '#27272a', color: '#fafafa' }}>
+                                      <DropdownMenuItem 
+                                        onClick={() => classifyAddress(tx.counterparty_wallet, "trusted")}
+                                        className="cursor-pointer hover:bg-green-500/20"
+                                      >
+                                        <Shield size={14} className="mr-2 text-green-500" />
+                                        <span className="text-green-400">Marquer comme fiable</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem 
+                                        onClick={() => classifyAddress(tx.counterparty_wallet, "suspicious")}
+                                        className="cursor-pointer hover:bg-yellow-500/20"
+                                      >
+                                        <AlertTriangle size={14} className="mr-2 text-yellow-500" />
+                                        <span className="text-yellow-400">Marquer comme suspect</span>
+                                      </DropdownMenuItem>
+                                      <DropdownMenuItem 
+                                        onClick={() => classifyAddress(tx.counterparty_wallet, "neutral")}
+                                        className="cursor-pointer hover:bg-gray-500/20"
+                                      >
+                                        <Circle size={14} className="mr-2 text-gray-400" />
+                                        <span className="text-gray-400">Retirer la classification</span>
+                                      </DropdownMenuItem>
+                                    </DropdownMenuContent>
+                                  </DropdownMenu>
+                                </span>
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                <p className="font-mono text-xs">{tx.counterparty_wallet}</p>
+                                <p className="text-xs text-muted-foreground">Clic droit pour classifier</p>
+                              </TooltipContent>
+                            </Tooltip>
+                          </TooltipProvider>
                         ) : <span className="text-zinc-500">Externe</span>
                       ) : (
                         <span className="wallet-name-cell">{tx.wallet_name}</span>
