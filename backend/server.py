@@ -2270,12 +2270,21 @@ async def delete_fiat_transaction(tx_id: str, current_user: dict = Depends(get_c
             await db.fiat_transactions.delete_one({"id": linked_tx_id, "user_id": user_id})
             counterpart_deleted = True
     
+    # Check for linked crypto transaction and delete it too
+    linked_crypto_tx_id = tx.get("linked_crypto_tx_id")
+    crypto_deleted = False
+    if linked_crypto_tx_id:
+        await db.transactions.delete_one({"id": linked_crypto_tx_id, "user_id": user_id})
+        crypto_deleted = True
+    
     # Delete the main transaction
     await db.fiat_transactions.delete_one({"id": tx_id, "user_id": user_id})
     
     message = "Transaction deleted"
     if counterpart_deleted:
-        message += " (+ contrepartie supprimée)"
+        message += " (+ contrepartie fiat supprimée)"
+    if crypto_deleted:
+        message += " (+ transaction crypto supprimée)"
     
     return {"message": message, "new_balance": new_balance}
 
