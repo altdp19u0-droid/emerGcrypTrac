@@ -1600,7 +1600,7 @@ const TransactionsPage = () => {
                         >
                           <SelectTrigger><SelectValue placeholder="Sélectionner un wallet interne..." /></SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="">Aucun (wallet externe)</SelectItem>
+                            <SelectItem value="none">Aucun (wallet externe)</SelectItem>
                             {wallets.filter(w => w.id !== newTransaction.wallet_id).map(w => (
                               <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
                             ))}
@@ -2652,7 +2652,7 @@ const PositionsPage = () => {
                     <Select value={newPosition.source_wallet_id} onValueChange={(v) => setNewPosition({...newPosition, source_wallet_id: v})}>
                       <SelectTrigger><SelectValue placeholder="Sélectionner le wallet source..." /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Aucun</SelectItem>
+                        <SelectItem value="none">Aucun</SelectItem>
                         {wallets.map(w => (
                           <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
                         ))}
@@ -2971,7 +2971,7 @@ const PositionsPage = () => {
                     <Select value={newMovement.target_wallet_id} onValueChange={(v) => setNewMovement({...newMovement, target_wallet_id: v})}>
                       <SelectTrigger><SelectValue placeholder="Sélectionner le wallet destinataire..." /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="">Aucun</SelectItem>
+                        <SelectItem value="none">Aucun</SelectItem>
                         {wallets.map(w => (
                           <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
                         ))}
