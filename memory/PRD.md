@@ -71,6 +71,12 @@ Application de suivi de portefeuille crypto-fiat "emerGcrypTrac" avec les foncti
 - [x] Position ↔ Wallet: Auto-create withdrawal when depositing to position
 - [x] Movement → Wallet: Auto-create deposit for realized yield/capital withdrawal
 
+### Auto-Assignment Rules (2026-02-07)
+- [x] Position rules configuration (address + asset matching)
+- [x] Preview matching transactions before applying
+- [x] Auto-create movements (capital_deposit, yield_realized) from matching transactions
+- [x] Link transactions to positions (linked_position_id)
+
 ## Database Schema
 
 ### Collections
