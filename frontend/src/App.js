@@ -2191,7 +2191,7 @@ const PnLPage = () => {
         <Card>
           <CardContent className="pt-6">
             <p className="pnl-label">Total Fees</p>
-            <p className="pnl-value text-orange-400">€{(summary.total_fees_eur || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</p>
+            <p className="pnl-value text-orange-500 font-bold">€{(summary.total_fees_eur || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</p>
           </CardContent>
         </Card>
       </div>
