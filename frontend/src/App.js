@@ -2659,7 +2659,7 @@ const PositionsPage = () => {
                       </SelectContent>
                     </Select>
                   </div>
-                  {newPosition.source_wallet_id && (
+                  {newPosition.source_wallet_id && newPosition.source_wallet_id !== "none" && (
                     <div className="flex items-center space-x-2">
                       <input 
                         type="checkbox" 
