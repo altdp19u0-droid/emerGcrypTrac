@@ -1796,7 +1796,7 @@ async def delete_fiat_account(account_id: str, current_user: dict = Depends(get_
 
 @api_router.post("/fiat-transactions", response_model=dict)
 async def create_fiat_transaction(tx_data: FiatTransactionCreate, current_user: dict = Depends(get_current_user)):
-    """Create a fiat transaction with source/destination tracking"""
+    """Create a fiat transaction with source/destination tracking and automatic counterpart"""
     account = await db.fiat_accounts.find_one({"id": tx_data.account_id, "user_id": current_user["id"]}, {"_id": 0})
     if not account:
         raise HTTPException(status_code=404, detail="Account not found")
@@ -1812,11 +1812,15 @@ async def create_fiat_transaction(tx_data: FiatTransactionCreate, current_user: 
     if not tx_dict.get("date"):
         tx_dict["date"] = datetime.now(timezone.utc).isoformat()
     
+    # Generate linked_tx_id for potential counterpart
+    main_tx_id = str(uuid.uuid4())
+    
     # Resolve source name
     source_name = None
+    source_account_data = None
     if tx_dict.get("source_type") == "bank" and tx_dict.get("source_account_id"):
-        source_account = await db.fiat_accounts.find_one({"id": tx_dict["source_account_id"]}, {"_id": 0})
-        source_name = source_account["name"] if source_account else "Compte inconnu"
+        source_account_data = await db.fiat_accounts.find_one({"id": tx_dict["source_account_id"], "user_id": current_user["id"]}, {"_id": 0})
+        source_name = source_account_data["name"] if source_account_data else "Compte inconnu"
     elif tx_dict.get("source_type") == "wallet" and tx_dict.get("source_wallet_id"):
         source_wallet = await db.wallets.find_one({"id": tx_dict["source_wallet_id"]}, {"_id": 0})
         source_name = source_wallet["name"] if source_wallet else tx_dict.get("source_wallet_address", "Wallet inconnu")
@@ -1828,9 +1832,10 @@ async def create_fiat_transaction(tx_data: FiatTransactionCreate, current_user: 
     
     # Resolve destination name
     dest_name = None
+    dest_account_data = None
     if tx_dict.get("dest_type") == "bank" and tx_dict.get("dest_account_id"):
-        dest_account = await db.fiat_accounts.find_one({"id": tx_dict["dest_account_id"]}, {"_id": 0})
-        dest_name = dest_account["name"] if dest_account else "Compte inconnu"
+        dest_account_data = await db.fiat_accounts.find_one({"id": tx_dict["dest_account_id"], "user_id": current_user["id"]}, {"_id": 0})
+        dest_name = dest_account_data["name"] if dest_account_data else "Compte inconnu"
     elif tx_dict.get("dest_type") == "wallet" and tx_dict.get("dest_wallet_id"):
         dest_wallet = await db.wallets.find_one({"id": tx_dict["dest_wallet_id"]}, {"_id": 0})
         dest_name = dest_wallet["name"] if dest_wallet else tx_dict.get("dest_wallet_address", "Wallet inconnu")
@@ -1842,11 +1847,102 @@ async def create_fiat_transaction(tx_data: FiatTransactionCreate, current_user: 
     
     # Set running balance
     tx_dict["running_balance"] = new_balance
+    tx_dict["linked_tx_id"] = None  # Will be set if counterpart is created
     
     tx = FiatTransaction(user_id=current_user["id"], **tx_dict)
+    tx.id = main_tx_id
     doc = tx.model_dump()
     await db.fiat_transactions.insert_one(doc)
-    return {"id": tx.id, "message": "Transaction created", "new_balance": new_balance}
+    
+    counterpart_id = None
+    counterpart_message = ""
+    
+    # === AUTO-CREATE COUNTERPART TRANSACTION ===
+    
+    # Case 1: Virement sortant vers un autre compte Fiat interne (transfer_out ou withdrawal vers bank)
+    if tx_dict.get("dest_type") == "bank" and dest_account_data and tx_data.amount < 0:
+        # Create incoming transaction on destination account
+        counterpart_amount = abs(tx_data.amount)
+        dest_new_balance = dest_account_data["balance"] + counterpart_amount
+        
+        await db.fiat_accounts.update_one(
+            {"id": dest_account_data["id"]},
+            {"$set": {"balance": dest_new_balance}}
+        )
+        
+        counterpart_tx = FiatTransaction(
+            user_id=current_user["id"],
+            account_id=dest_account_data["id"],
+            type="transfer_in",
+            amount=counterpart_amount,
+            description=f"Virement de {account['name']}",
+            date=tx_dict["date"],
+            source_type="bank",
+            source_account_id=tx_data.account_id,
+            source_name=account["name"],
+            dest_type="bank",
+            dest_account_id=dest_account_data["id"],
+            dest_name=dest_account_data["name"],
+            running_balance=dest_new_balance,
+            linked_tx_id=main_tx_id
+        )
+        counterpart_doc = counterpart_tx.model_dump()
+        await db.fiat_transactions.insert_one(counterpart_doc)
+        
+        # Update main transaction with linked_tx_id
+        await db.fiat_transactions.update_one(
+            {"id": main_tx_id},
+            {"$set": {"linked_tx_id": counterpart_tx.id}}
+        )
+        
+        counterpart_id = counterpart_tx.id
+        counterpart_message = f" + contrepartie créée sur {dest_account_data['name']}"
+    
+    # Case 2: Virement entrant depuis un autre compte Fiat interne (transfer_in ou deposit depuis bank)
+    elif tx_dict.get("source_type") == "bank" and source_account_data and tx_data.amount > 0:
+        # Create outgoing transaction on source account
+        counterpart_amount = -abs(tx_data.amount)
+        source_new_balance = source_account_data["balance"] + counterpart_amount
+        
+        await db.fiat_accounts.update_one(
+            {"id": source_account_data["id"]},
+            {"$set": {"balance": source_new_balance}}
+        )
+        
+        counterpart_tx = FiatTransaction(
+            user_id=current_user["id"],
+            account_id=source_account_data["id"],
+            type="transfer_out",
+            amount=counterpart_amount,
+            description=f"Virement vers {account['name']}",
+            date=tx_dict["date"],
+            source_type="bank",
+            source_account_id=source_account_data["id"],
+            source_name=source_account_data["name"],
+            dest_type="bank",
+            dest_account_id=tx_data.account_id,
+            dest_name=account["name"],
+            running_balance=source_new_balance,
+            linked_tx_id=main_tx_id
+        )
+        counterpart_doc = counterpart_tx.model_dump()
+        await db.fiat_transactions.insert_one(counterpart_doc)
+        
+        # Update main transaction with linked_tx_id
+        await db.fiat_transactions.update_one(
+            {"id": main_tx_id},
+            {"$set": {"linked_tx_id": counterpart_tx.id}}
+        )
+        
+        counterpart_id = counterpart_tx.id
+        counterpart_message = f" + contrepartie créée sur {source_account_data['name']}"
+    
+    return {
+        "id": main_tx_id, 
+        "message": f"Transaction created{counterpart_message}", 
+        "new_balance": new_balance,
+        "counterpart_id": counterpart_id
+    }
 
 @api_router.get("/fiat-transactions")
 async def get_fiat_transactions(
