@@ -2495,8 +2495,8 @@ const PositionsPage = () => {
             <DialogTrigger asChild>
               <Button data-testid="add-position-btn"><Plus size={16} className="mr-2" />Nouvelle Position</Button>
             </DialogTrigger>
-          <DialogContent className="max-w-lg">
-            <DialogHeader><DialogTitle>Ajouter une Position</DialogTitle></DialogHeader>
+            <DialogContent className="max-w-lg">
+              <DialogHeader><DialogTitle>Ajouter une Position</DialogTitle></DialogHeader>
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
                 <div>
