@@ -1133,7 +1133,7 @@ const TransactionsPage = () => {
     start_date: "", 
     end_date: "",
     hide_spam: true, // Hide spam by default
-    include_fiat: true, // Include fiat transactions by default
+    include_fiat: false, // Fiat transactions excluded by default
     fiat_account_ids: [] // Multi-select for fiat accounts
   });
   const [addressClassifications, setAddressClassifications] = useState({});
