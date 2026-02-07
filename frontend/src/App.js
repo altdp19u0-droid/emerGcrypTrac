@@ -1884,6 +1884,7 @@ const TransactionsPage = () => {
                 <TableHead>Amount</TableHead>
                 <TableHead>Prix/Débit</TableHead>
                 <TableHead>Valeur/Crédit</TableHead>
+                <TableHead>Fees</TableHead>
                 <TableHead>Source</TableHead>
                 <TableHead>Destination</TableHead>
                 <TableHead>Date</TableHead>
