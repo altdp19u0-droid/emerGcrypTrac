@@ -3059,6 +3059,46 @@ const FiatPage = () => {
     }
   };
 
+  // Export functions
+  const exportFiatAccounts = async () => {
+    try {
+      const response = await api.get("/export/fiat-accounts", { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'comptes_fiat.csv';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("Export des comptes téléchargé");
+    } catch (error) {
+      toast.error("Erreur lors de l'export");
+    }
+  };
+
+  const exportFiatTransactions = async () => {
+    try {
+      const url = selectedAccount 
+        ? `/export/fiat-transactions?account_id=${selectedAccount.id}`
+        : "/export/fiat-transactions";
+      const response = await api.get(url, { responseType: 'blob' });
+      const blobUrl = window.URL.createObjectURL(new Blob([response.data]));
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = selectedAccount 
+        ? `transactions_${selectedAccount.name.replace(/\s+/g, '_')}.csv`
+        : 'transactions_fiat.csv';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(blobUrl);
+      document.body.removeChild(a);
+      toast.success("Export des transactions téléchargé");
+    } catch (error) {
+      toast.error("Erreur lors de l'export");
+    }
+  };
+
   const fetchTransactions = async (accountId) => {
     if (!accountId) return;
     try {
