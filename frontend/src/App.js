@@ -2919,6 +2919,15 @@ const PositionsPage = () => {
                           <Button 
                             variant="ghost" 
                             size="icon" 
+                            className={`h-7 w-7 ${pos.rule_enabled ? 'text-yellow-400 hover:text-yellow-300' : 'text-gray-400 hover:text-gray-300'}`}
+                            onClick={() => openRulesDialog(pos)}
+                            title="Règles d'affectation"
+                          >
+                            <Settings size={14} />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
                             className="h-7 w-7 text-blue-400 hover:text-blue-300"
                             onClick={() => openEditDialog(pos)}
                             title="Modifier"
