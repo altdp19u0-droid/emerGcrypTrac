@@ -2678,7 +2678,11 @@ const PositionsPage = () => {
         <div className="header-actions">
           <Button variant="outline" onClick={exportPositions}>
             <Download size={16} className="mr-2" />
-            Export CSV
+            Export Positions
+          </Button>
+          <Button variant="outline" onClick={() => handleExportMovementsCSV()}>
+            <Download size={16} className="mr-2" />
+            Export Mouvements
           </Button>
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
