@@ -2159,6 +2159,94 @@ async def create_fiat_transaction(tx_data: FiatTransactionCreate, current_user: 
             
             counterpart_message += f" + retrait EUR créé sur {source_wallet['name']}"
     
+    # Case 7: ACHAT CRYPTO (crypto_buy) - Fiat → Crypto via passerelle (Prime, Bleap, etc.)
+    if tx_data.type == "crypto_buy" and tx_data.crypto_asset and tx_data.crypto_amount and tx_data.crypto_amount > 0:
+        wallet_id = tx_dict.get("dest_wallet_id")
+        if wallet_id:
+            dest_wallet = await db.wallets.find_one({"id": wallet_id, "user_id": current_user["id"]}, {"_id": 0})
+            if dest_wallet:
+                # Calculate price based on EUR/crypto ratio
+                crypto_amount = tx_data.crypto_amount
+                eur_amount = abs(tx_data.amount)
+                price_eur = eur_amount / crypto_amount if crypto_amount > 0 else 1.0
+                
+                # Estimate USD price (approximate EUR/USD rate)
+                price_usd = price_eur * 1.08
+                
+                # Create Buy transaction in crypto wallet
+                crypto_tx = Transaction(
+                    user_id=current_user["id"],
+                    type="Buy",
+                    asset=tx_data.crypto_asset,
+                    amount=crypto_amount,
+                    price_usd=price_usd,
+                    price_eur=price_eur,
+                    value_usd=crypto_amount * price_usd,
+                    value_eur=eur_amount,
+                    fees=0,
+                    fees_currency="EUR",
+                    wallet_id=dest_wallet["id"],
+                    wallet_name=dest_wallet["name"],
+                    source="fiat_purchase",
+                    date=tx_dict["date"],
+                    counterparty_wallet=account["name"],
+                    notes=f"Achat via {dest_wallet['name']} - {eur_amount:.2f} EUR → {crypto_amount:.6f} {tx_data.crypto_asset}"
+                )
+                crypto_doc = crypto_tx.model_dump()
+                await db.transactions.insert_one(crypto_doc)
+                
+                # Link fiat transaction to crypto transaction
+                await db.fiat_transactions.update_one(
+                    {"id": main_tx_id},
+                    {"$set": {"linked_crypto_tx_id": crypto_tx.id}}
+                )
+                
+                counterpart_message += f" + achat {crypto_amount:.6f} {tx_data.crypto_asset} créé sur {dest_wallet['name']}"
+    
+    # Case 8: VENTE CRYPTO (crypto_sell) - Crypto → Fiat via passerelle
+    if tx_data.type == "crypto_sell" and tx_data.crypto_asset and tx_data.crypto_amount and tx_data.crypto_amount > 0:
+        wallet_id = tx_dict.get("source_wallet_id")
+        if wallet_id:
+            source_wallet = await db.wallets.find_one({"id": wallet_id, "user_id": current_user["id"]}, {"_id": 0})
+            if source_wallet:
+                # Calculate price based on EUR/crypto ratio
+                crypto_amount = tx_data.crypto_amount
+                eur_amount = abs(tx_data.amount)
+                price_eur = eur_amount / crypto_amount if crypto_amount > 0 else 1.0
+                
+                # Estimate USD price
+                price_usd = price_eur * 1.08
+                
+                # Create Sell transaction in crypto wallet (negative amount = sold)
+                crypto_tx = Transaction(
+                    user_id=current_user["id"],
+                    type="Sell",
+                    asset=tx_data.crypto_asset,
+                    amount=-crypto_amount,  # Negative because it's leaving the wallet
+                    price_usd=price_usd,
+                    price_eur=price_eur,
+                    value_usd=crypto_amount * price_usd,
+                    value_eur=eur_amount,
+                    fees=0,
+                    fees_currency="EUR",
+                    wallet_id=source_wallet["id"],
+                    wallet_name=source_wallet["name"],
+                    source="fiat_sale",
+                    date=tx_dict["date"],
+                    counterparty_wallet=account["name"],
+                    notes=f"Vente via {source_wallet['name']} - {crypto_amount:.6f} {tx_data.crypto_asset} → {eur_amount:.2f} EUR"
+                )
+                crypto_doc = crypto_tx.model_dump()
+                await db.transactions.insert_one(crypto_doc)
+                
+                # Link fiat transaction to crypto transaction
+                await db.fiat_transactions.update_one(
+                    {"id": main_tx_id},
+                    {"$set": {"linked_crypto_tx_id": crypto_tx.id}}
+                )
+                
+                counterpart_message += f" + vente {crypto_amount:.6f} {tx_data.crypto_asset} créée sur {source_wallet['name']}"
+    
     return {
         "id": main_tx_id, 
         "message": f"Transaction created{counterpart_message}", 
