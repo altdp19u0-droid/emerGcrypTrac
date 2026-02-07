@@ -2057,7 +2057,7 @@ const TransactionsPage = () => {
                               </TooltipTrigger>
                               <TooltipContent>
                                 <p className="font-mono text-xs">{tx.counterparty_wallet}</p>
-                                <p className="text-xs text-muted-foreground">Clic droit pour classifier</p>
+                                <p className="text-xs text-muted-foreground">Cliquez pour classifier</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
