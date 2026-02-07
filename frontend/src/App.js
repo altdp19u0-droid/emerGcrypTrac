@@ -2059,6 +2059,7 @@ const TransactionsPage = () => {
                           </Tooltip>
                         </TooltipProvider>
                       ) : "-"
+                      )
                     )}
                   </TableCell>
                   <TableCell>{new Date(tx.date).toLocaleDateString("fr-FR")}</TableCell>
