@@ -2601,6 +2601,39 @@ const PositionsPage = () => {
                 />
               </div>
               
+              {/* Interdépendance: Wallet Source */}
+              <div className="border-t pt-4 mt-4">
+                <Label className="text-sm text-muted-foreground mb-2 block">Interdépendance (optionnel)</Label>
+                <div className="space-y-3">
+                  <div>
+                    <Label>Wallet Source</Label>
+                    <Select value={newPosition.source_wallet_id} onValueChange={(v) => setNewPosition({...newPosition, source_wallet_id: v})}>
+                      <SelectTrigger><SelectValue placeholder="Sélectionner le wallet source..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Aucun</SelectItem>
+                        {wallets.map(w => (
+                          <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {newPosition.source_wallet_id && (
+                    <div className="flex items-center space-x-2">
+                      <input 
+                        type="checkbox" 
+                        id="create_withdrawal_tx"
+                        checked={newPosition.create_withdrawal_tx}
+                        onChange={(e) => setNewPosition({...newPosition, create_withdrawal_tx: e.target.checked})}
+                        className="rounded"
+                      />
+                      <Label htmlFor="create_withdrawal_tx" className="text-sm cursor-pointer">
+                        Créer automatiquement une transaction de retrait dans le wallet
+                      </Label>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
               <Button onClick={handleCreatePosition} className="w-full" data-testid="submit-position-btn">Créer la Position</Button>
             </div>
           </DialogContent>
