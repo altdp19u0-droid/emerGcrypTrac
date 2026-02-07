@@ -2300,13 +2300,55 @@ async def delete_fiat_transaction(tx_id: str, current_user: dict = Depends(get_c
 
 @api_router.post("/positions", response_model=dict)
 async def create_position(position: PositionCreate, current_user: dict = Depends(get_current_user)):
-    """Create a new investment position"""
+    """Create a new investment position with optional wallet interdependence"""
     pos_dict = position.model_dump()
     pos_dict["deposit_date"] = pos_dict.get("deposit_date") or datetime.now(timezone.utc).isoformat()
+    
+    # Remove non-model fields
+    create_withdrawal_tx = pos_dict.pop("create_withdrawal_tx", False)
+    source_wallet_id = pos_dict.get("source_wallet_id")
+    
     pos = Position(user_id=current_user["id"], **pos_dict)
+    
+    linked_tx_id = None
+    linked_tx_message = ""
+    
+    # Interdépendance: Créer une transaction de retrait dans le wallet source
+    if create_withdrawal_tx and source_wallet_id:
+        # Vérifier que le wallet existe
+        wallet = await db.wallets.find_one({"id": source_wallet_id, "user_id": current_user["id"]}, {"_id": 0})
+        if wallet:
+            # Créer une transaction de retrait (Transfer Out)
+            withdrawal_tx = Transaction(
+                user_id=current_user["id"],
+                wallet_id=source_wallet_id,
+                type="Transfer Out",
+                asset=position.asset,
+                amount=-abs(position.amount),  # Négatif pour un retrait
+                date=pos_dict["deposit_date"],
+                tx_hash="",
+                price_eur=0,
+                value_eur=0,
+                notes=f"Dépôt vers position {position.platform} - {position.product_type}",
+                linked_position_id=pos.id
+            )
+            withdrawal_doc = withdrawal_tx.model_dump()
+            await db.transactions.insert_one(withdrawal_doc)
+            linked_tx_id = withdrawal_tx.id
+            linked_tx_message = " + transaction de retrait créée dans le wallet"
+            
+            # Mettre à jour la position avec l'ID de la transaction liée
+            pos_dict["linked_tx_id"] = linked_tx_id
+            pos = Position(user_id=current_user["id"], **pos_dict)
+    
     doc = pos.model_dump()
     await db.positions.insert_one(doc)
-    return {"id": pos.id, "message": "Position created"}
+    
+    return {
+        "id": pos.id, 
+        "message": f"Position créée{linked_tx_message}",
+        "linked_tx_id": linked_tx_id
+    }
 
 @api_router.get("/positions")
 async def get_positions(current_user: dict = Depends(get_current_user)):
