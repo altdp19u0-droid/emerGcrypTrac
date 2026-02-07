@@ -2032,7 +2032,8 @@ async def create_fiat_transaction(tx_data: FiatTransactionCreate, current_user: 
         counterpart_message = f" + contrepartie créée sur {source_account_data['name']}"
     
     # Case 3: Virement sortant vers un Wallet Crypto (dest_type == "wallet")
-    if tx_dict.get("dest_type") == "wallet" and tx_dict.get("dest_wallet_id") and tx_data.amount < 0:
+    # Skip for crypto_buy as it has its own dedicated logic (Case 7)
+    if tx_dict.get("dest_type") == "wallet" and tx_dict.get("dest_wallet_id") and tx_data.amount < 0 and tx_data.type != "crypto_buy":
         dest_wallet = await db.wallets.find_one({"id": tx_dict["dest_wallet_id"], "user_id": current_user["id"]}, {"_id": 0})
         if dest_wallet:
             # Créer une transaction crypto "Deposit" sur le wallet
@@ -2065,7 +2066,8 @@ async def create_fiat_transaction(tx_data: FiatTransactionCreate, current_user: 
             counterpart_message += f" + dépôt EUR créé sur {dest_wallet['name']}"
     
     # Case 4: Virement sortant vers un Exchange (dest_type == "exchange" avec wallet sélectionné)
-    if tx_dict.get("dest_type") == "exchange" and tx_dict.get("dest_wallet_id") and tx_data.amount < 0:
+    # Skip for crypto_buy as it has its own dedicated logic (Case 7)
+    if tx_dict.get("dest_type") == "exchange" and tx_dict.get("dest_wallet_id") and tx_data.amount < 0 and tx_data.type != "crypto_buy":
         dest_wallet = await db.wallets.find_one({"id": tx_dict["dest_wallet_id"], "user_id": current_user["id"]}, {"_id": 0})
         if dest_wallet:
             # Créer une transaction crypto "Deposit" sur le wallet exchange
