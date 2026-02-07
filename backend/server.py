@@ -2772,7 +2772,7 @@ async def preview_position_rules(position_id: str, current_user: dict = Depends(
 
 @api_router.post("/position-movements", response_model=dict)
 async def create_position_movement(movement: PositionMovementCreate, current_user: dict = Depends(get_current_user)):
-    """Create a new movement for a position (yield, withdrawal, loss) with optional wallet interdependence"""
+    """Create a new movement for a position (yield, withdrawal, loss, capital addition) with optional wallet interdependence"""
     # Verify position exists and belongs to user
     position = await db.positions.find_one({"id": movement.position_id, "user_id": current_user["id"]}, {"_id": 0})
     if not position:
@@ -2792,9 +2792,51 @@ async def create_position_movement(movement: PositionMovementCreate, current_use
     
     linked_tx_id = None
     linked_tx_message = ""
+    position_update_message = ""
     
-    # Interdépendance: Créer une transaction de dépôt dans le wallet cible
-    if create_deposit_tx and target_wallet_id and movement.movement_type in ["yield_realized", "capital_withdrawal"]:
+    # Mettre à jour le montant de la position si ajout ou retrait de capital
+    if movement.movement_type == "capital_addition":
+        # Ajout de capital = augmente le montant de la position
+        new_amount = position.get("amount", 0) + abs(movement.amount)
+        await db.positions.update_one(
+            {"id": movement.position_id},
+            {"$set": {"amount": new_amount}}
+        )
+        position_update_message = f" (nouveau capital: {new_amount:.2f})"
+    elif movement.movement_type == "capital_withdrawal":
+        # Retrait de capital = diminue le montant de la position
+        new_amount = max(0, position.get("amount", 0) - abs(movement.amount))
+        await db.positions.update_one(
+            {"id": movement.position_id},
+            {"$set": {"amount": new_amount}}
+        )
+        position_update_message = f" (nouveau capital: {new_amount:.2f})"
+    
+    # Interdépendance: Créer une transaction dans le wallet
+    # Pour ajout de capital: créer un Transfer Out depuis le wallet source
+    if create_deposit_tx and target_wallet_id and movement.movement_type == "capital_addition":
+        wallet = await db.wallets.find_one({"id": target_wallet_id, "user_id": current_user["id"]}, {"_id": 0})
+        if wallet:
+            withdrawal_tx = Transaction(
+                user_id=current_user["id"],
+                wallet_id=target_wallet_id,
+                type="Transfer Out",
+                asset=movement.asset,
+                amount=-abs(movement.amount),
+                date=mov_dict["date"],
+                tx_hash=movement.tx_hash or "",
+                price_eur=0,
+                value_eur=0,
+                notes=f"Ajout capital vers position {position.get('platform', '')} - {position.get('product_type', '')}",
+                linked_position_id=movement.position_id
+            )
+            await db.transactions.insert_one(withdrawal_tx.model_dump())
+            linked_tx_id = withdrawal_tx.id
+            linked_tx_message = " + transaction de retrait créée dans le wallet"
+            mov_dict["linked_tx_id"] = linked_tx_id
+    
+    # Pour rendement ou retrait: créer un Transfer In vers le wallet cible
+    elif create_deposit_tx and target_wallet_id and movement.movement_type in ["yield_realized", "capital_withdrawal"]:
         # Vérifier que le wallet existe
         wallet = await db.wallets.find_one({"id": target_wallet_id, "user_id": current_user["id"]}, {"_id": 0})
         if wallet:
