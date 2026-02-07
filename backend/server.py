@@ -2502,6 +2502,121 @@ async def export_transactions(current_user: dict = Depends(get_current_user)):
         headers={"Content-Disposition": "attachment; filename=transactions.csv"}
     )
 
+@api_router.get("/export/fiat-accounts")
+async def export_fiat_accounts(current_user: dict = Depends(get_current_user)):
+    """Export all fiat accounts as CSV"""
+    accounts = await db.fiat_accounts.find({"user_id": current_user["id"]}, {"_id": 0}).to_list(1000)
+    
+    output = io.StringIO()
+    if accounts:
+        fieldnames = ["name", "currency", "balance", "created_at"]
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+        for acc in accounts:
+            writer.writerow({
+                "name": acc.get("name", ""),
+                "currency": acc.get("currency", "EUR"),
+                "balance": acc.get("balance", 0),
+                "created_at": acc.get("created_at", "")
+            })
+    
+    output.seek(0)
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode()),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=comptes_fiat.csv"}
+    )
+
+@api_router.get("/export/fiat-transactions")
+async def export_fiat_transactions(
+    account_id: Optional[str] = None,
+    current_user: dict = Depends(get_current_user)
+):
+    """Export fiat transactions as CSV"""
+    query = {"user_id": current_user["id"]}
+    if account_id:
+        query["account_id"] = account_id
+    
+    transactions = await db.fiat_transactions.find(query, {"_id": 0}).sort("date", -1).to_list(10000)
+    
+    # Get account names for reference
+    accounts = await db.fiat_accounts.find({"user_id": current_user["id"]}, {"_id": 0}).to_list(100)
+    account_names = {a["id"]: a["name"] for a in accounts}
+    
+    output = io.StringIO()
+    if transactions:
+        fieldnames = ["date", "type", "description", "debit", "credit", "solde", "compte", "origine", "destination"]
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+        for tx in transactions:
+            amount = tx.get("amount", 0)
+            writer.writerow({
+                "date": tx.get("date", ""),
+                "type": tx.get("type", ""),
+                "description": tx.get("description", ""),
+                "debit": abs(amount) if amount < 0 else "",
+                "credit": amount if amount > 0 else "",
+                "solde": tx.get("running_balance", ""),
+                "compte": account_names.get(tx.get("account_id"), ""),
+                "origine": tx.get("source_name", ""),
+                "destination": tx.get("dest_name", "")
+            })
+    
+    output.seek(0)
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode()),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=transactions_fiat.csv"}
+    )
+
+@api_router.get("/export/positions")
+async def export_positions(current_user: dict = Depends(get_current_user)):
+    """Export all investment positions as CSV"""
+    positions = await db.positions.find({"user_id": current_user["id"]}, {"_id": 0}).to_list(1000)
+    movements = await db.position_movements.find({"user_id": current_user["id"]}, {"_id": 0}).to_list(10000)
+    
+    # Group movements by position
+    movements_by_pos = {}
+    for mov in movements:
+        pos_id = mov.get("position_id")
+        if pos_id not in movements_by_pos:
+            movements_by_pos[pos_id] = {"yield": 0, "withdrawn": 0, "loss": 0}
+        if mov.get("movement_type") == "yield_realized":
+            movements_by_pos[pos_id]["yield"] += mov.get("amount", 0)
+        elif mov.get("movement_type") == "capital_withdrawal":
+            movements_by_pos[pos_id]["withdrawn"] += mov.get("amount", 0)
+        elif mov.get("movement_type") == "impermanent_loss":
+            movements_by_pos[pos_id]["loss"] += mov.get("amount", 0)
+    
+    output = io.StringIO()
+    if positions:
+        fieldnames = ["plateforme", "type", "asset", "montant_initial", "apy", "date_depot", "date_deblocage", "rendement_realise", "capital_retire", "pertes", "notes"]
+        writer = csv.DictWriter(output, fieldnames=fieldnames)
+        writer.writeheader()
+        for pos in positions:
+            pos_id = pos.get("id")
+            mov_data = movements_by_pos.get(pos_id, {"yield": 0, "withdrawn": 0, "loss": 0})
+            writer.writerow({
+                "plateforme": pos.get("platform", ""),
+                "type": pos.get("product_type", ""),
+                "asset": pos.get("asset", ""),
+                "montant_initial": pos.get("amount", 0),
+                "apy": pos.get("apy", 0),
+                "date_depot": pos.get("deposit_date", ""),
+                "date_deblocage": pos.get("unlock_date", ""),
+                "rendement_realise": mov_data["yield"],
+                "capital_retire": mov_data["withdrawn"],
+                "pertes": mov_data["loss"],
+                "notes": pos.get("notes", "")
+            })
+    
+    output.seek(0)
+    return StreamingResponse(
+        io.BytesIO(output.getvalue().encode()),
+        media_type="text/csv",
+        headers={"Content-Disposition": "attachment; filename=positions.csv"}
+    )
+
 # ==================== FISCAL PDF EXPORT ====================
 
 @api_router.get("/export/fiscal-pdf")
