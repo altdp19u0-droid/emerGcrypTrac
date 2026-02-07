@@ -1091,6 +1091,11 @@ button[role="combobox"] span {
   color: var(--accent-red, #f87171);
 }
 
+/* Fees styling - more visible orange */
+.pnl-value.text-orange-500 {
+  color: #f97316 !important; /* orange-500 - more vibrant */
+}
+
 /* ==================== REPORTS PAGE ==================== */
 .reports-grid {
   display: grid;
