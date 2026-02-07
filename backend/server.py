@@ -950,7 +950,8 @@ async def sync_wallet_from_etherscan(
                                 price_eur=price_eur,
                                 value_usd=amount * price_usd,
                                 value_eur=amount * price_eur,
-                                fees=0,
+                                fees=float(tx.get("gasUsed", 0)) * float(tx.get("gasPrice", 0)) / (10 ** 18),
+                                fees_currency="ETH",  # Gas fees are in ETH
                                 wallet_id=wallet_id,
                                 wallet_name=f"{wallet['name']} ({network})",
                                 source=f"blockchain_{network.lower()}",
