@@ -2376,6 +2376,11 @@ async def create_position(position: PositionCreate, current_user: dict = Depends
     create_withdrawal_tx = pos_dict.pop("create_withdrawal_tx", False)
     source_wallet_id = pos_dict.get("source_wallet_id")
     
+    # Ignore "none" values
+    if source_wallet_id == "none":
+        source_wallet_id = None
+        pos_dict["source_wallet_id"] = None
+    
     pos = Position(user_id=current_user["id"], **pos_dict)
     
     linked_tx_id = None
