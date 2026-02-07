@@ -53,19 +53,23 @@ Application de suivi de portefeuille crypto-fiat "emerGcrypTrac" avec les foncti
 - None currently
 
 ### P1 - High Priority
-1. **Full Interdependence (Double-Entry Accounting)**
-   - Position ↔ Wallet: Auto-create deposit when "Rendement réalisé" added
-   - Crypto → Position: Auto-decrease wallet when depositing to position
-   - Crypto ↔ Crypto: Auto-create both send/receive transactions
+- None - Full interdependence implemented
 
 ### P2 - Medium Priority
-2. **Fix gray rows in P&L table** - Assets with Unicode characters showing empty
+- Manual testing of all 3 interdependence types via UI
 
 ### P3 - Low Priority / Backlog
-3. **Refactoring**
+1. **Refactoring**
    - Split `App.js` into separate page components
    - Split `server.py` into routes/models/services
    - Organize directory structure
+
+## Completed Features
+
+### Interdependence System (2026-02-07)
+- [x] Crypto ↔ Crypto: Auto-create counterpart transaction for internal transfers
+- [x] Position ↔ Wallet: Auto-create withdrawal when depositing to position
+- [x] Movement → Wallet: Auto-create deposit for realized yield/capital withdrawal
 
 ## Database Schema
 
