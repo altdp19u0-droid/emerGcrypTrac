@@ -1955,7 +1955,7 @@ const TransactionsPage = () => {
                       <span className="text-zinc-500">-</span>
                     )}
                   </TableCell>
-                  {/* Source (Wallet/Counterparty for crypto, source_name for fiat) */}
+                  {/* Source - pour crypto: dépend du type de transaction */}
                   <TableCell>
                     {tx.tx_category === "fiat" ? (
                       tx.source_name ? (
@@ -1968,10 +1968,17 @@ const TransactionsPage = () => {
                         <span className="font-mono text-xs">{tx.source_wallet_address.substring(0, 10)}...</span>
                       ) : "-"
                     ) : (
-                      <span className="wallet-name-cell">{tx.wallet_name}</span>
+                      // Pour crypto: Source = counterparty si Transfer In/Deposit/Buy, sinon wallet_name
+                      ["Transfer In", "Deposit", "Buy"].includes(tx.type) ? (
+                        tx.counterparty_wallet ? (
+                          <span className="font-mono text-xs text-zinc-400">{tx.counterparty_wallet.substring(0, 10)}...</span>
+                        ) : <span className="text-zinc-500">Externe</span>
+                      ) : (
+                        <span className="wallet-name-cell">{tx.wallet_name}</span>
+                      )
                     )}
                   </TableCell>
-                  {/* Destination (counterparty for crypto, dest_name for fiat) */}
+                  {/* Destination - pour crypto: dépend du type de transaction */}
                   <TableCell>
                     {tx.tx_category === "fiat" ? (
                       tx.dest_name ? (
@@ -1984,7 +1991,11 @@ const TransactionsPage = () => {
                         <span className="font-mono text-xs">{tx.dest_wallet_address.substring(0, 10)}...</span>
                       ) : tx.account_name || "-"
                     ) : (
-                      tx.counterparty_wallet ? (
+                      // Pour crypto: Destination = wallet_name si Transfer In/Deposit/Buy, sinon counterparty
+                      ["Transfer In", "Deposit", "Buy"].includes(tx.type) ? (
+                        <span className="wallet-name-cell">{tx.wallet_name}</span>
+                      ) : (
+                        tx.counterparty_wallet ? (
                         <TooltipProvider>
                           <Tooltip delayDuration={300}>
                             <TooltipTrigger asChild>
