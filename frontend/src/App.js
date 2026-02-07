@@ -3464,11 +3464,29 @@ const FiatPage = () => {
                                 )}
                                 
                                 {newTransaction.source_type === "exchange" && (
-                                  <Input 
-                                    value={newTransaction.source_wallet_address} 
-                                    onChange={(e) => setNewTransaction({...newTransaction, source_wallet_address: e.target.value})}
-                                    placeholder="Nom de l'exchange (ex: Kraken, Binance...)"
-                                  />
+                                  <>
+                                    {wallets.filter(w => w.type === "manual" || w.name.toLowerCase().includes("kraken") || w.name.toLowerCase().includes("binance") || w.name.toLowerCase().includes("coinbase")).length > 0 && (
+                                      <div className="space-y-2">
+                                        <Label className="text-xs text-muted-foreground">Sélectionner un wallet existant (optionnel)</Label>
+                                        <Select value={newTransaction.source_wallet_id || ""} onValueChange={(v) => {
+                                          const wallet = wallets.find(w => w.id === v);
+                                          setNewTransaction({...newTransaction, source_wallet_id: v, source_wallet_address: wallet?.name || ""});
+                                        }}>
+                                          <SelectTrigger><SelectValue placeholder="Choisir un wallet..." /></SelectTrigger>
+                                          <SelectContent>
+                                            {wallets.filter(w => w.type === "manual" || w.name.toLowerCase().includes("kraken") || w.name.toLowerCase().includes("binance") || w.name.toLowerCase().includes("coinbase")).map(w => (
+                                              <SelectItem key={w.id} value={w.id}>{w.name} ({w.network})</SelectItem>
+                                            ))}
+                                          </SelectContent>
+                                        </Select>
+                                      </div>
+                                    )}
+                                    <Input 
+                                      value={newTransaction.source_wallet_address} 
+                                      onChange={(e) => setNewTransaction({...newTransaction, source_wallet_address: e.target.value})}
+                                      placeholder="Nom de l'exchange (ex: Kraken, Binance...)"
+                                    />
+                                  </>
                                 )}
                               </div>
                             )}
