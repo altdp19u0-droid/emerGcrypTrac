@@ -2257,6 +2257,7 @@ const PositionsPage = () => {
   const [selectedPositionForMovement, setSelectedPositionForMovement] = useState(null);
   const [movementsDialogOpen, setMovementsDialogOpen] = useState(false);
   const [selectedPositionMovements, setSelectedPositionMovements] = useState([]);
+  const [wallets, setWallets] = useState([]);  // Pour interdépendance
   const [newPosition, setNewPosition] = useState({
     platform: "",
     product_type: "savings",
@@ -2265,7 +2266,9 @@ const PositionsPage = () => {
     apy: 0,
     deposit_date: new Date().toISOString().split("T")[0],
     unlock_date: "",
-    notes: ""
+    notes: "",
+    source_wallet_id: "",
+    create_withdrawal_tx: false
   });
   const [newMovement, setNewMovement] = useState({
     movement_type: "yield_realized",
@@ -2273,7 +2276,9 @@ const PositionsPage = () => {
     asset: "",
     date: new Date().toISOString().split("T")[0],
     tx_hash: "",
-    notes: ""
+    notes: "",
+    target_wallet_id: "",
+    create_deposit_tx: false
   });
 
   const platforms = ["Bleap", "Neverless", "Frankencoin", "8Lends", "Kraken", "Binance", "Autre"];
@@ -2307,7 +2312,20 @@ const PositionsPage = () => {
     }
   };
 
-  useEffect(() => { fetchPositions(); }, []);
+  // Charger les wallets pour l'interdépendance
+  const fetchWallets = async () => {
+    try {
+      const response = await api.get("/wallets");
+      setWallets(response.data || []);
+    } catch (error) {
+      console.error("Erreur chargement wallets", error);
+    }
+  };
+
+  useEffect(() => { 
+    fetchPositions(); 
+    fetchWallets();
+  }, []);
 
   const handleCreatePosition = async () => {
     if (!newPosition.platform || !newPosition.amount) {
@@ -2315,11 +2333,11 @@ const PositionsPage = () => {
       return;
     }
     try {
-      await api.post("/positions", {
+      const response = await api.post("/positions", {
         ...newPosition,
         unlock_date: newPosition.unlock_date || null
       });
-      toast.success("Position créée");
+      toast.success(response.data.message || "Position créée");
       setDialogOpen(false);
       setNewPosition({
         platform: "",
@@ -2329,7 +2347,9 @@ const PositionsPage = () => {
         apy: 0,
         deposit_date: new Date().toISOString().split("T")[0],
         unlock_date: "",
-        notes: ""
+        notes: "",
+        source_wallet_id: "",
+        create_withdrawal_tx: false
       });
       fetchPositions();
     } catch (error) {
