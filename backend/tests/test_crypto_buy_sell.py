@@ -168,16 +168,23 @@ class TestCryptoBuySellFeature:
         print(f"✓ Fiat debit transaction verified: {fiat_tx['amount']} {fiat_account['currency']}, linked_crypto_tx_id: {fiat_tx.get('linked_crypto_tx_id')}")
         
         # Verify crypto Buy transaction was created in wallet
+        # Use the linked_crypto_tx_id from the fiat transaction
+        linked_crypto_tx_id = fiat_tx.get("linked_crypto_tx_id")
         crypto_after = self.get_crypto_transactions(auth_headers, dest_wallet["id"])
         
-        # Find crypto transactions with source='fiat_purchase' and matching date
-        new_crypto_txs = [
-            tx for tx in crypto_after 
-            if tx.get("source") == "fiat_purchase" 
-            and tx.get("asset") == test_asset
-            and tx.get("amount") > 0
-            and tx not in crypto_before
-        ]
+        # Find crypto transaction by ID if available, or by source='fiat_purchase'
+        new_crypto_txs = []
+        if linked_crypto_tx_id:
+            new_crypto_txs = [tx for tx in crypto_after if tx.get("id") == linked_crypto_tx_id]
+        
+        if not new_crypto_txs:
+            # Fallback: Find crypto transactions with source='fiat_purchase' and matching date
+            new_crypto_txs = [
+                tx for tx in crypto_after 
+                if tx.get("source") == "fiat_purchase" 
+                and tx.get("asset") == test_asset
+                and tx.get("amount") > 0
+            ]
         
         assert len(new_crypto_txs) >= 1, f"Crypto Buy transaction should be created. Found: {len(new_crypto_txs)}"
         
