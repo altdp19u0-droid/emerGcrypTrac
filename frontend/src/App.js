@@ -2583,6 +2583,7 @@ const PositionsPage = () => {
             </div>
           </DialogContent>
         </Dialog>
+        </div>
       </div>
 
       {/* Summary Cards */}
