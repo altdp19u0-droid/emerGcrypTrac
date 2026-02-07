@@ -2107,7 +2107,7 @@ async def update_fiat_transaction(tx_id: str, tx_data: FiatTransactionUpdate, cu
 
 @api_router.delete("/fiat-transactions/{tx_id}")
 async def delete_fiat_transaction(tx_id: str, current_user: dict = Depends(get_current_user)):
-    """Delete a fiat transaction and update account balance"""
+    """Delete a fiat transaction, its counterpart if exists, and update account balances"""
     user_id = current_user["id"]
     
     # Find the transaction
@@ -2117,6 +2117,7 @@ async def delete_fiat_transaction(tx_id: str, current_user: dict = Depends(get_c
     
     # Get account and reverse the amount
     account = await db.fiat_accounts.find_one({"id": tx["account_id"], "user_id": user_id}, {"_id": 0})
+    new_balance = None
     if account:
         new_balance = account["balance"] - tx.get("amount", 0)
         await db.fiat_accounts.update_one(
@@ -2124,10 +2125,31 @@ async def delete_fiat_transaction(tx_id: str, current_user: dict = Depends(get_c
             {"$set": {"balance": new_balance}}
         )
     
-    # Delete the transaction
+    # Check for linked counterpart transaction and delete it too
+    linked_tx_id = tx.get("linked_tx_id")
+    counterpart_deleted = False
+    if linked_tx_id:
+        linked_tx = await db.fiat_transactions.find_one({"id": linked_tx_id, "user_id": user_id}, {"_id": 0})
+        if linked_tx:
+            # Reverse balance on the counterpart account
+            linked_account = await db.fiat_accounts.find_one({"id": linked_tx["account_id"], "user_id": user_id}, {"_id": 0})
+            if linked_account:
+                linked_new_balance = linked_account["balance"] - linked_tx.get("amount", 0)
+                await db.fiat_accounts.update_one(
+                    {"id": linked_account["id"]},
+                    {"$set": {"balance": linked_new_balance}}
+                )
+            await db.fiat_transactions.delete_one({"id": linked_tx_id, "user_id": user_id})
+            counterpart_deleted = True
+    
+    # Delete the main transaction
     await db.fiat_transactions.delete_one({"id": tx_id, "user_id": user_id})
     
-    return {"message": "Transaction deleted", "new_balance": new_balance if account else None}
+    message = "Transaction deleted"
+    if counterpart_deleted:
+        message += " (+ contrepartie supprimée)"
+    
+    return {"message": message, "new_balance": new_balance}
 
 # ==================== POSITIONS/INVESTMENTS ENDPOINTS ====================
 
