@@ -1938,6 +1938,134 @@ async def create_fiat_transaction(tx_data: FiatTransactionCreate, current_user: 
         counterpart_id = counterpart_tx.id
         counterpart_message = f" + contrepartie créée sur {source_account_data['name']}"
     
+    # Case 3: Virement sortant vers un Wallet Crypto (dest_type == "wallet")
+    if tx_dict.get("dest_type") == "wallet" and tx_dict.get("dest_wallet_id") and tx_data.amount < 0:
+        dest_wallet = await db.wallets.find_one({"id": tx_dict["dest_wallet_id"], "user_id": current_user["id"]}, {"_id": 0})
+        if dest_wallet:
+            # Créer une transaction crypto "Deposit" sur le wallet
+            crypto_tx = Transaction(
+                user_id=current_user["id"],
+                type="Deposit",
+                asset="EUR",
+                amount=abs(tx_data.amount),
+                price_usd=1.08,  # Approximation EUR/USD
+                price_eur=1.0,
+                value_usd=abs(tx_data.amount) * 1.08,
+                value_eur=abs(tx_data.amount),
+                fees=0,
+                fees_currency="EUR",
+                wallet_id=dest_wallet["id"],
+                wallet_name=dest_wallet["name"],
+                source="fiat_transfer",
+                date=tx_dict["date"],
+                counterparty_wallet=account["name"]
+            )
+            crypto_doc = crypto_tx.model_dump()
+            await db.transactions.insert_one(crypto_doc)
+            
+            # Lier la transaction fiat à la transaction crypto
+            await db.fiat_transactions.update_one(
+                {"id": main_tx_id},
+                {"$set": {"linked_crypto_tx_id": crypto_tx.id}}
+            )
+            
+            counterpart_message += f" + dépôt EUR créé sur {dest_wallet['name']}"
+    
+    # Case 4: Virement sortant vers un Exchange (dest_type == "exchange" avec wallet sélectionné)
+    if tx_dict.get("dest_type") == "exchange" and tx_dict.get("dest_wallet_id") and tx_data.amount < 0:
+        dest_wallet = await db.wallets.find_one({"id": tx_dict["dest_wallet_id"], "user_id": current_user["id"]}, {"_id": 0})
+        if dest_wallet:
+            # Créer une transaction crypto "Deposit" sur le wallet exchange
+            crypto_tx = Transaction(
+                user_id=current_user["id"],
+                type="Deposit",
+                asset="EUR",
+                amount=abs(tx_data.amount),
+                price_usd=1.08,
+                price_eur=1.0,
+                value_usd=abs(tx_data.amount) * 1.08,
+                value_eur=abs(tx_data.amount),
+                fees=0,
+                fees_currency="EUR",
+                wallet_id=dest_wallet["id"],
+                wallet_name=dest_wallet["name"],
+                source="fiat_transfer",
+                date=tx_dict["date"],
+                counterparty_wallet=account["name"]
+            )
+            crypto_doc = crypto_tx.model_dump()
+            await db.transactions.insert_one(crypto_doc)
+            
+            await db.fiat_transactions.update_one(
+                {"id": main_tx_id},
+                {"$set": {"linked_crypto_tx_id": crypto_tx.id}}
+            )
+            
+            counterpart_message += f" + dépôt EUR créé sur {dest_wallet['name']}"
+    
+    # Case 5: Virement entrant depuis un Wallet Crypto (source_type == "wallet")
+    if tx_dict.get("source_type") == "wallet" and tx_dict.get("source_wallet_id") and tx_data.amount > 0:
+        source_wallet = await db.wallets.find_one({"id": tx_dict["source_wallet_id"], "user_id": current_user["id"]}, {"_id": 0})
+        if source_wallet:
+            # Créer une transaction crypto "Withdrawal" sur le wallet
+            crypto_tx = Transaction(
+                user_id=current_user["id"],
+                type="Withdrawal",
+                asset="EUR",
+                amount=-abs(tx_data.amount),
+                price_usd=1.08,
+                price_eur=1.0,
+                value_usd=abs(tx_data.amount) * 1.08,
+                value_eur=abs(tx_data.amount),
+                fees=0,
+                fees_currency="EUR",
+                wallet_id=source_wallet["id"],
+                wallet_name=source_wallet["name"],
+                source="fiat_transfer",
+                date=tx_dict["date"],
+                counterparty_wallet=account["name"]
+            )
+            crypto_doc = crypto_tx.model_dump()
+            await db.transactions.insert_one(crypto_doc)
+            
+            await db.fiat_transactions.update_one(
+                {"id": main_tx_id},
+                {"$set": {"linked_crypto_tx_id": crypto_tx.id}}
+            )
+            
+            counterpart_message += f" + retrait EUR créé sur {source_wallet['name']}"
+    
+    # Case 6: Virement entrant depuis un Exchange (source_type == "exchange" avec wallet sélectionné)
+    if tx_dict.get("source_type") == "exchange" and tx_dict.get("source_wallet_id") and tx_data.amount > 0:
+        source_wallet = await db.wallets.find_one({"id": tx_dict["source_wallet_id"], "user_id": current_user["id"]}, {"_id": 0})
+        if source_wallet:
+            crypto_tx = Transaction(
+                user_id=current_user["id"],
+                type="Withdrawal",
+                asset="EUR",
+                amount=-abs(tx_data.amount),
+                price_usd=1.08,
+                price_eur=1.0,
+                value_usd=abs(tx_data.amount) * 1.08,
+                value_eur=abs(tx_data.amount),
+                fees=0,
+                fees_currency="EUR",
+                wallet_id=source_wallet["id"],
+                wallet_name=source_wallet["name"],
+                source="fiat_transfer",
+                date=tx_dict["date"],
+                counterparty_wallet=account["name"]
+            )
+            crypto_doc = crypto_tx.model_dump()
+            await db.transactions.insert_one(crypto_doc)
+            
+            await db.fiat_transactions.update_one(
+                {"id": main_tx_id},
+                {"$set": {"linked_crypto_tx_id": crypto_tx.id}}
+            )
+            
+            counterpart_message += f" + retrait EUR créé sur {source_wallet['name']}"
+    
     return {
         "id": main_tx_id, 
         "message": f"Transaction created{counterpart_message}", 
