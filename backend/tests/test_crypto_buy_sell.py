@@ -160,8 +160,12 @@ class TestCryptoBuySellFeature:
         
         fiat_tx = new_fiat_txs[0]
         assert fiat_tx["type"] == "crypto_buy", f"Fiat tx type should be crypto_buy, got: {fiat_tx['type']}"
-        assert fiat_tx["amount"] == -test_amount, f"Fiat tx amount should be negative (debit): {fiat_tx['amount']}"
-        print(f"✓ Fiat debit transaction verified: {fiat_tx['amount']} {fiat_account['currency']}")
+        # crypto_buy stores amount as positive, but the balance effect is a debit
+        # Check linked_crypto_tx_id to confirm crypto transaction was created
+        assert fiat_tx["amount"] == test_amount, f"Fiat tx amount should be positive: {fiat_tx['amount']}"
+        assert "linked_crypto_tx_id" in fiat_tx and fiat_tx["linked_crypto_tx_id"], \
+            f"Fiat tx should have linked_crypto_tx_id: {fiat_tx.get('linked_crypto_tx_id')}"
+        print(f"✓ Fiat debit transaction verified: {fiat_tx['amount']} {fiat_account['currency']}, linked_crypto_tx_id: {fiat_tx.get('linked_crypto_tx_id')}")
         
         # Verify crypto Buy transaction was created in wallet
         crypto_after = self.get_crypto_transactions(auth_headers, dest_wallet["id"])
