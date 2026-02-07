@@ -1962,6 +1962,8 @@ async def update_fiat_transaction(tx_id: str, tx_data: FiatTransactionUpdate, cu
                 update_data["source_name"] = src_wallet["name"] if src_wallet else "Wallet inconnu"
             else:
                 update_data["source_name"] = tx_data.source_wallet_address or existing.get("source_wallet_address")
+        elif source_type == "exchange":
+            update_data["source_name"] = tx_data.source_wallet_address or existing.get("source_wallet_address") or "Exchange"
         else:
             update_data["source_name"] = "Externe"
     
@@ -1981,6 +1983,8 @@ async def update_fiat_transaction(tx_id: str, tx_data: FiatTransactionUpdate, cu
                 update_data["dest_name"] = dest_wallet["name"] if dest_wallet else "Wallet inconnu"
             else:
                 update_data["dest_name"] = tx_data.dest_wallet_address or existing.get("dest_wallet_address")
+        elif dest_type == "exchange":
+            update_data["dest_name"] = tx_data.dest_wallet_address or existing.get("dest_wallet_address") or "Exchange"
         else:
             update_data["dest_name"] = "Externe"
     
