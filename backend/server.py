@@ -443,6 +443,8 @@ class PositionMovement(BaseModel):
     date: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     tx_hash: Optional[str] = None
     notes: str = ""
+    target_wallet_id: Optional[str] = None  # Wallet destinataire lié
+    linked_tx_id: Optional[str] = None  # Transaction de dépôt liée
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 class PositionMovementUpdate(BaseModel):
