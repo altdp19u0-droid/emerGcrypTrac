@@ -400,6 +400,10 @@ class PositionCreate(BaseModel):
     notes: str = ""
     source_wallet_id: Optional[str] = None  # Wallet source pour interdépendance
     create_withdrawal_tx: bool = False  # Créer une transaction de retrait dans le wallet source
+    # Règles d'affectation automatique
+    rule_address: Optional[str] = None  # Adresse pour matcher les transactions
+    rule_asset: Optional[str] = None  # Asset pour matcher les transactions
+    rule_enabled: bool = False  # Activer/désactiver la règle
 
 class Position(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -415,6 +419,10 @@ class Position(BaseModel):
     notes: str = ""
     source_wallet_id: Optional[str] = None  # Wallet source lié
     linked_tx_id: Optional[str] = None  # Transaction de retrait liée
+    # Règles d'affectation automatique
+    rule_address: Optional[str] = None  # Adresse pour matcher les transactions
+    rule_asset: Optional[str] = None  # Asset pour matcher les transactions
+    rule_enabled: bool = False  # Activer/désactiver la règle
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 class PositionUpdate(BaseModel):
@@ -426,6 +434,10 @@ class PositionUpdate(BaseModel):
     deposit_date: Optional[str] = None
     unlock_date: Optional[str] = None
     notes: Optional[str] = None
+    # Règles d'affectation automatique
+    rule_address: Optional[str] = None
+    rule_asset: Optional[str] = None
+    rule_enabled: Optional[bool] = None
 
 # ==================== POSITION MOVEMENTS MODELS ====================
 
