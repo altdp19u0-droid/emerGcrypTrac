@@ -2978,7 +2978,7 @@ async def get_portfolio_allocation(current_user: dict = Depends(get_current_user
 
 @api_router.get("/portfolio/pnl")
 async def get_pnl_report(current_user: dict = Depends(get_current_user)):
-    """Calculate P&L using FIFO method in EUR (excluding SPAM transactions)"""
+    """Calculate P&L using FIFO method in EUR (excluding SPAM and internal transfers)"""
     # Exclude spam transactions from P&L calculations - stricter filter
     transactions = await db.transactions.find(
         {
@@ -2990,6 +2990,25 @@ async def get_pnl_report(current_user: dict = Depends(get_current_user)):
     
     # Filter again in Python to be absolutely sure (belt and suspenders)
     transactions = [tx for tx in transactions if tx.get("is_spam") != True]
+    
+    # Identify internal transfers (non-taxable)
+    # Internal transfers are: linked_tx_id set, linked_position_id set, or source contains "transfer"
+    def is_internal_transfer(tx):
+        """Check if transaction is an internal transfer (non-taxable)"""
+        # Has linked counterpart transaction = internal transfer between wallets
+        if tx.get("linked_tx_id"):
+            return True
+        # Linked to a position = capital movement, not taxable
+        if tx.get("linked_position_id"):
+            return True
+        # Source indicates fiat transfer
+        if "transfer" in tx.get("source", "").lower():
+            return True
+        # Notes indicate internal transfer
+        notes = tx.get("notes", "").lower()
+        if "contrepartie" in notes or "interne" in notes or "transfert" in notes:
+            return True
+        return False
     
     # Group by asset
     asset_txs: Dict[str, List[dict]] = {}
@@ -3024,6 +3043,9 @@ async def get_pnl_report(current_user: dict = Depends(get_current_user)):
             fee_eur = fees if fees_currency == "EUR" else fees * 0.92
             total_fees_eur += fee_eur
             
+            # Check if this is an internal transfer (non-taxable)
+            internal_transfer = is_internal_transfer(tx)
+            
             if tx_type in ["Transfer In", "Buy"]:
                 # Add to FIFO queue
                 cost_per_unit = price_eur + (fee_eur / amount if amount > 0 else 0)
@@ -3054,8 +3076,10 @@ async def get_pnl_report(current_user: dict = Depends(get_current_user)):
                         oldest["amount"] -= remaining
                         remaining = 0
                 
-                # Realized P&L for this sale
-                realized_pnl_eur += proceeds - cost_basis
+                # Realized P&L for this sale - ONLY if NOT an internal transfer
+                if not internal_transfer:
+                    realized_pnl_eur += proceeds - cost_basis
+                # For internal transfers, P&L is neutral (0)
         
         # Calculate current holdings and unrealized P&L
         current_holdings = sum(lot["amount"] for lot in fifo_queue)
