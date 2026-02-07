@@ -1781,6 +1781,8 @@ async def update_transaction(tx_id: str, tx_data: TransactionUpdate, current_use
         update_data["date"] = tx_data.date
     if tx_data.counterparty_wallet is not None:
         update_data["counterparty_wallet"] = tx_data.counterparty_wallet
+    if tx_data.income_category is not None:
+        update_data["income_category"] = tx_data.income_category if tx_data.income_category != "" else None
     
     # Auto-calculate values if amount or prices changed
     amount = tx_data.amount if tx_data.amount is not None else existing.get("amount", 0)
