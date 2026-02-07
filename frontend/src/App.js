@@ -2854,7 +2854,7 @@ const PositionsPage = () => {
                         <Badge variant="outline">{getProductTypeLabel(pos.product_type)}</Badge>
                       </TableCell>
                       <TableCell className="font-mono text-zinc-100">{pos.asset}</TableCell>
-                      <TableCell className="text-right font-mono">
+                      <TableCell className="text-right font-mono text-zinc-100">
                         <div>{pos.amount?.toFixed(2)}</div>
                         {pos.capital_withdrawn > 0 && (
                           <div className="text-xs text-amber-400">-{pos.capital_withdrawn.toFixed(2)} retiré</div>
@@ -2863,7 +2863,7 @@ const PositionsPage = () => {
                           <div className="text-xs text-red-400">-{pos.total_loss.toFixed(2)} perte</div>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">{pos.apy}%</TableCell>
+                      <TableCell className="text-right text-zinc-100">{pos.apy}%</TableCell>
                       <TableCell className="text-right text-green-400 font-mono">
                         +{(pos.realized_yield || 0).toFixed(2)}
                         {pos.movements_count > 0 && (
