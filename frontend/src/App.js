@@ -2409,7 +2409,7 @@ const PositionsPage = () => {
       date: new Date().toISOString().split("T")[0],
       tx_hash: "",
       notes: "",
-      target_wallet_id: "",
+      target_wallet_id: "none",
       create_deposit_tx: false
     });
     setMovementDialogOpen(true);
