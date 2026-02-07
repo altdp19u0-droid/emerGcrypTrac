@@ -8,6 +8,7 @@ Application de suivi de portefeuille crypto-fiat "emerGcrypTrac" avec les foncti
 - Export CSV et PDF fiscal
 - Double-entry accounting pour les transferts
 - Exclusion des transactions spam des rapports
+- Transactions Fiat ↔ Crypto via passerelles (Prime, Bleap)
 
 ## Application Access
 - **URL**: https://asset-movement-suite.preview.emergentagent.com
@@ -35,6 +36,18 @@ Application de suivi de portefeuille crypto-fiat "emerGcrypTrac" avec les foncti
 - [x] PDF fiscal report generation
 - [x] Double-entry: Fiat ↔ Fiat transfers
 - [x] Double-entry: Fiat → Crypto Wallet transfers
+- [x] **NEW**: Fiat ↔ Crypto via Passerelles (Prime, Bleap, etc.)
+
+### Fiat-to-Crypto Conversion Feature (2026-02-07)
+- [x] **crypto_buy**: EUR → Crypto achat via passerelle
+  - Crée transaction fiat (débit compte bancaire)
+  - Crée automatiquement transaction crypto "Buy" dans le wallet de destination
+  - Asset crypto et montant configurables (EURC, USDC, EURA, etc.)
+- [x] **crypto_sell**: Crypto → EUR vente via passerelle
+  - Crée transaction fiat (crédit compte bancaire)
+  - Crée automatiquement transaction crypto "Sell" dans le wallet source
+- [x] Frontend: Section dédiée "Crypto Reçue/Vendue" avec sélecteur de wallet, dropdown asset, montant crypto
+- [x] Backend: Liaison automatique via `linked_crypto_tx_id`
 
 ### UI Fixes (Completed)
 - [x] Fixed invisible text on buttons
@@ -53,10 +66,10 @@ Application de suivi de portefeuille crypto-fiat "emerGcrypTrac" avec les foncti
 - None currently
 
 ### P1 - High Priority
-- None - Full interdependence implemented
+- User-Managed Spam List: UI to manage spam assets (currently done via database scripts)
 
 ### P2 - Medium Priority
-- Manual testing of all 3 interdependence types via UI
+- Minor accessibility fix: Add aria-describedby to DialogContent components
 
 ### P3 - Low Priority / Backlog
 1. **Refactoring**
@@ -82,15 +95,15 @@ Application de suivi de portefeuille crypto-fiat "emerGcrypTrac" avec les foncti
 ### Collections
 - `users`: User accounts with hashed passwords
 - `wallets`: Crypto wallet information
-- `transactions`: Crypto transactions (with is_spam flag)
+- `transactions`: Crypto transactions (with is_spam flag, linked_crypto_tx_id)
 - `fiat_accounts`: Fiat account balances
-- `fiat_transactions`: Fiat transaction records
+- `fiat_transactions`: Fiat transaction records (with crypto_asset, crypto_amount, linked_crypto_tx_id)
 - `positions`: DeFi/CeFi investment positions
 - `position_movements`: Position earnings/withdrawals
 
 ## Key API Endpoints
 - `POST /api/auth/login` - User login
-- `GET/POST /api/fiat-transactions` - Fiat transactions
+- `GET/POST /api/fiat-transactions` - Fiat transactions (supports crypto_buy/crypto_sell with crypto_asset, crypto_amount)
 - `PUT/DELETE /api/fiat-transactions/{id}` - Edit/delete fiat tx
 - `PUT /api/transactions/{id}` - Edit crypto transaction
 - `GET/POST /api/positions` - Investment positions
@@ -99,4 +112,4 @@ Application de suivi de portefeuille crypto-fiat "emerGcrypTrac" avec les foncti
 - `GET /api/export/fiscal-pdf` - PDF fiscal report
 
 ## Last Updated
-2026-02-07 - Fixed Total Fees text color visibility in P&L page
+2026-02-07 - Implemented Fiat-to-Crypto conversion feature (crypto_buy/crypto_sell)
