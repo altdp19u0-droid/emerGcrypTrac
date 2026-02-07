@@ -1149,7 +1149,9 @@ const TransactionsPage = () => {
     source: "manual", 
     date: new Date().toISOString().split("T")[0], 
     time: new Date().toTimeString().slice(0, 5),
-    counterparty_wallet: ""
+    counterparty_wallet: "",
+    target_wallet_id: "",
+    create_counterpart_tx: false
   });
   
   // Address comparison state
