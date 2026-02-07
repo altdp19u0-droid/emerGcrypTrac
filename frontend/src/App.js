@@ -1607,7 +1607,7 @@ const TransactionsPage = () => {
                           </SelectContent>
                         </Select>
                       </div>
-                      {newTransaction.target_wallet_id && (
+                      {newTransaction.target_wallet_id && newTransaction.target_wallet_id !== "none" && (
                         <div className="flex items-center space-x-2">
                           <input 
                             type="checkbox" 
