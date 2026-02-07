@@ -3601,7 +3601,8 @@ const FiatPage = () => {
         source_account_id = selectedAccount.id;
       }
       
-      await api.post("/fiat-transactions", { 
+      // Build request payload
+      const payload = { 
         ...transactionData,
         amount: finalAmount,
         date: dateTime,
@@ -3614,7 +3615,15 @@ const FiatPage = () => {
         dest_account_id: dest_account_id || null,
         dest_wallet_id: newTransaction.dest_wallet_id || null,
         dest_wallet_address: newTransaction.dest_wallet_address || null
-      });
+      };
+      
+      // Add crypto conversion fields for crypto_buy/crypto_sell
+      if (["crypto_buy", "crypto_sell"].includes(newTransaction.type)) {
+        payload.crypto_asset = newTransaction.crypto_asset;
+        payload.crypto_amount = newTransaction.crypto_amount;
+      }
+      
+      await api.post("/fiat-transactions", payload);
       toast.success("Transaction ajoutée");
       setTxDialogOpen(false);
       setNewTransaction({ 
