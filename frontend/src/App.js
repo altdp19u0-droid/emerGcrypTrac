@@ -2309,7 +2309,7 @@ const PositionsPage = () => {
     deposit_date: new Date().toISOString().split("T")[0],
     unlock_date: "",
     notes: "",
-    source_wallet_id: "",
+    source_wallet_id: "none",
     create_withdrawal_tx: false
   });
   const [newMovement, setNewMovement] = useState({
@@ -2319,7 +2319,7 @@ const PositionsPage = () => {
     date: new Date().toISOString().split("T")[0],
     tx_hash: "",
     notes: "",
-    target_wallet_id: "",
+    target_wallet_id: "none",
     create_deposit_tx: false
   });
 
