@@ -2511,6 +2511,24 @@ const PositionsPage = () => {
     }
   };
 
+  // Export movements to CSV
+  const handleExportMovementsCSV = async (positionId) => {
+    try {
+      const response = await api.get(`/export/position-movements${positionId ? `?position_id=${positionId}` : ''}`, {
+        responseType: 'blob'
+      });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `mouvements_positions_${new Date().toISOString().split('T')[0]}.csv`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+      toast.success("Export CSV téléchargé");
+    } catch (error) {
+      toast.error("Erreur lors de l'export");
+    }
+  };
+
   // ==================== RÈGLES D'AFFECTATION ====================
   
   // Ouvrir le dialog des règles
