@@ -1824,6 +1824,47 @@ async def toggle_spam_transaction(tx_id: str, current_user: dict = Depends(get_c
     )
     return {"message": f"Transaction {'marquée comme spam' if new_spam_status else 'retirée du spam'}", "is_spam": new_spam_status}
 
+class IncomeCategoryUpdate(BaseModel):
+    income_category: Optional[str] = None  # interest, yield, airdrop, reward, cashback, fee, gas, subscription, payment, or None
+
+@api_router.patch("/transactions/{tx_id}/category")
+async def update_transaction_category(tx_id: str, data: IncomeCategoryUpdate, current_user: dict = Depends(get_current_user)):
+    """Update the income/expense category for any transaction (including blockchain imports)"""
+    tx = await db.transactions.find_one({"id": tx_id, "user_id": current_user["id"]}, {"_id": 0})
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    # Validate category
+    valid_categories = ["interest", "yield", "airdrop", "reward", "cashback", "fee", "gas", "subscription", "payment", None, ""]
+    if data.income_category not in valid_categories:
+        raise HTTPException(status_code=400, detail=f"Catégorie invalide. Valeurs acceptées: {valid_categories}")
+    
+    # Set to None if empty string
+    category_value = data.income_category if data.income_category not in ["", None] else None
+    
+    await db.transactions.update_one(
+        {"id": tx_id, "user_id": current_user["id"]},
+        {"$set": {"income_category": category_value}}
+    )
+    
+    category_labels = {
+        "interest": "Intérêts",
+        "yield": "Rendement",
+        "airdrop": "Airdrop",
+        "reward": "Récompense",
+        "cashback": "Cashback",
+        "fee": "Frais",
+        "gas": "Frais de gas",
+        "subscription": "Abonnement",
+        "payment": "Paiement",
+        None: "Aucune catégorie"
+    }
+    
+    return {
+        "message": f"Catégorie mise à jour: {category_labels.get(category_value, category_value)}",
+        "income_category": category_value
+    }
+
 @api_router.post("/transactions/import-csv")
 async def import_csv_transactions(import_data: CSVImportRequest, current_user: dict = Depends(get_current_user)):
     """Import transactions from CSV"""
