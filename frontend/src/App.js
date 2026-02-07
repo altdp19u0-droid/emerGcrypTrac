@@ -4325,39 +4325,364 @@ const FiatPage = () => {
 
 const ReportsPage = () => {
   const { accessToken } = useAuth();
-  const [portfolio, setPortfolio] = useState({ assets: [] });
+  const [pnlData, setPnlData] = useState({ reports: [], summary: {} });
   const [transactions, setTransactions] = useState([]);
+  const [positions, setPositions] = useState([]);
+  const [fiatAccounts, setFiatAccounts] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const api = createAuthenticatedApi(accessToken);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [portfolioRes, txRes] = await Promise.all([api.get("/portfolio/summary"), api.get("/transactions", { params: { page_size: 1000 } })]);
-        setPortfolio(portfolioRes.data);
-        setTransactions(txRes.data.transactions);
+        const [pnlRes, txRes, posRes, fiatRes] = await Promise.all([
+          api.get("/portfolio/pnl"),
+          api.get("/transactions", { params: { page_size: 5000, hide_spam: true } }),
+          api.get("/positions"),
+          api.get("/fiat-accounts")
+        ]);
+        setPnlData(pnlRes.data);
+        setTransactions(txRes.data.transactions || []);
+        setPositions(posRes.data.positions || []);
+        setFiatAccounts(fiatRes.data || []);
       } catch (error) {
         console.error("Error:", error);
+      } finally {
+        setLoading(false);
       }
     };
     fetchData();
   }, []);
 
+  // Calculs des statistiques
   const totalFees = transactions.reduce((sum, tx) => sum + (tx.fees || 0), 0);
-  const totalBuys = transactions.filter(tx => tx.type === "Buy").reduce((sum, tx) => sum + tx.value_eur, 0);
-  const totalSells = transactions.filter(tx => tx.type === "Sell").reduce((sum, tx) => sum + tx.value_eur, 0);
+  const totalTransfersIn = transactions.filter(tx => tx.type === "Transfer In").reduce((sum, tx) => sum + Math.abs(tx.value_eur || 0), 0);
+  const totalTransfersOut = transactions.filter(tx => tx.type === "Transfer Out").reduce((sum, tx) => sum + Math.abs(tx.value_eur || 0), 0);
+  const totalBuys = transactions.filter(tx => tx.type === "Buy").reduce((sum, tx) => sum + (tx.value_eur || 0), 0);
+  const totalSells = transactions.filter(tx => tx.type === "Sell").reduce((sum, tx) => sum + (tx.value_eur || 0), 0);
+  
+  // Positions
+  const totalPositionsCapital = positions.reduce((sum, p) => sum + (p.amount || 0), 0);
+  const totalPositionsYield = positions.reduce((sum, p) => sum + (p.realized_yield || 0), 0);
+  
+  // Fiat
+  const totalFiatBalance = fiatAccounts.reduce((sum, a) => sum + (a.balance || 0), 0);
+  
+  // Top assets par valeur
+  const topAssets = [...(pnlData.reports || [])]
+    .sort((a, b) => b.current_value_eur - a.current_value_eur)
+    .slice(0, 10);
+
+  // Transactions par mois (6 derniers mois)
+  const txByMonth = {};
+  const now = new Date();
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    txByMonth[key] = { in: 0, out: 0, count: 0 };
+  }
+  transactions.forEach(tx => {
+    const month = tx.date?.substring(0, 7);
+    if (txByMonth[month]) {
+      txByMonth[month].count++;
+      if (tx.type === "Transfer In" || tx.type === "Buy") {
+        txByMonth[month].in += Math.abs(tx.value_eur || 0);
+      } else {
+        txByMonth[month].out += Math.abs(tx.value_eur || 0);
+      }
+    }
+  });
+
+  if (loading) {
+    return (
+      <div className="page-content flex items-center justify-center">
+        <RefreshCw className="animate-spin" size={32} />
+      </div>
+    );
+  }
 
   return (
     <div className="page-content" data-testid="reports-page">
-      <div className="page-header"><div><h1 className="page-title">Rapports</h1><p className="page-subtitle">Portfolio analysis</p></div></div>
-      <div className="reports-grid">
-        <Card><CardHeader><CardTitle>Total Fees</CardTitle></CardHeader><CardContent><div className="report-value">{totalFees.toFixed(2)} EUR</div></CardContent></Card>
-        <Card><CardHeader><CardTitle>Total Buys</CardTitle></CardHeader><CardContent><div className="report-value text-green-400">{totalBuys.toFixed(2)} EUR</div></CardContent></Card>
-        <Card><CardHeader><CardTitle>Total Sells</CardTitle></CardHeader><CardContent><div className="report-value text-red-400">{totalSells.toFixed(2)} EUR</div></CardContent></Card>
-        <Card className="col-span-full"><CardHeader><CardTitle>Holdings</CardTitle></CardHeader><CardContent>
-          <Table><TableHeader><TableRow><TableHead>Asset</TableHead><TableHead>Amount</TableHead><TableHead>Value EUR</TableHead></TableRow></TableHeader>
-            <TableBody>{portfolio.assets.map((a) => (<TableRow key={a.asset}><TableCell>{a.asset}</TableCell><TableCell>{a.amount.toLocaleString()}</TableCell><TableCell>€{a.value_eur.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</TableCell></TableRow>))}</TableBody></Table>
-        </CardContent></Card>
+      <div className="page-header">
+        <div>
+          <h1 className="page-title">Rapports</h1>
+          <p className="page-subtitle">Analyse complète du portefeuille</p>
+        </div>
+      </div>
+      
+      {/* Section P&L */}
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold mb-3 text-zinc-300">Performance (P&L)</h2>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <Card className="bg-gradient-to-br from-green-900/30 to-green-800/10 border-green-500/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-zinc-400">P&L Réalisé</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${(pnlData.summary?.total_realized_pnl_eur || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                €{(pnlData.summary?.total_realized_pnl_eur || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-br from-blue-900/30 to-blue-800/10 border-blue-500/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-zinc-400">P&L Non-Réalisé</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${(pnlData.summary?.total_unrealized_pnl_eur || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                €{(pnlData.summary?.total_unrealized_pnl_eur || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-br from-purple-900/30 to-purple-800/10 border-purple-500/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-zinc-400">P&L Total</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className={`text-2xl font-bold ${(pnlData.summary?.total_pnl_eur || 0) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                €{(pnlData.summary?.total_pnl_eur || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-br from-amber-900/30 to-amber-800/10 border-amber-500/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-zinc-400">Total Frais</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-amber-400">
+                €{(pnlData.summary?.total_fees_eur || totalFees).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Section Portefeuille */}
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold mb-3 text-zinc-300">Valeur du Portefeuille</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-zinc-400">Holdings Crypto</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-zinc-100">
+                €{(pnlData.summary?.total_holdings_value_eur || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+              </div>
+              <p className="text-xs text-zinc-500 mt-1">{pnlData.reports?.length || 0} actifs</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-zinc-400">Positions (Savings/Lending)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-zinc-100">
+                {totalPositionsCapital.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+              </div>
+              <p className="text-xs text-green-400 mt-1">+{totalPositionsYield.toFixed(2)} rendement</p>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-zinc-400">Comptes Fiat</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-zinc-100">
+                €{totalFiatBalance.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+              </div>
+              <p className="text-xs text-zinc-500 mt-1">{fiatAccounts.length} compte(s)</p>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Section Activité */}
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold mb-3 text-zinc-300">Activité des Transactions</h2>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-zinc-400">Entrées (Transfer In)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-xl font-bold text-green-400">
+                €{totalTransfersIn.toLocaleString("fr-FR", { minimumFractionDigits: 0 })}
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-zinc-400">Sorties (Transfer Out)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-xl font-bold text-red-400">
+                €{totalTransfersOut.toLocaleString("fr-FR", { minimumFractionDigits: 0 })}
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-zinc-400">Achats (Buy)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-xl font-bold text-blue-400">
+                €{totalBuys.toLocaleString("fr-FR", { minimumFractionDigits: 0 })}
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm text-zinc-400">Ventes (Sell)</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-xl font-bold text-orange-400">
+                €{totalSells.toLocaleString("fr-FR", { minimumFractionDigits: 0 })}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Activité par mois */}
+      <div className="mb-6">
+        <h2 className="text-lg font-semibold mb-3 text-zinc-300">Activité des 6 derniers mois</h2>
+        <Card>
+          <CardContent className="pt-4">
+            <div className="grid grid-cols-6 gap-2">
+              {Object.entries(txByMonth).map(([month, data]) => (
+                <div key={month} className="text-center">
+                  <div className="text-xs text-zinc-500 mb-2">{month}</div>
+                  <div className="h-24 flex flex-col justify-end items-center gap-1">
+                    <div 
+                      className="w-8 bg-green-500/60 rounded-t" 
+                      style={{ height: `${Math.min(100, (data.in / 10000) * 100)}%`, minHeight: data.in > 0 ? '4px' : '0' }}
+                      title={`Entrées: €${data.in.toFixed(0)}`}
+                    />
+                    <div 
+                      className="w-8 bg-red-500/60 rounded-b" 
+                      style={{ height: `${Math.min(100, (data.out / 10000) * 100)}%`, minHeight: data.out > 0 ? '4px' : '0' }}
+                      title={`Sorties: €${data.out.toFixed(0)}`}
+                    />
+                  </div>
+                  <div className="text-xs text-zinc-400 mt-1">{data.count} tx</div>
+                </div>
+              ))}
+            </div>
+            <div className="flex justify-center gap-6 mt-4 text-xs">
+              <span className="flex items-center gap-1"><div className="w-3 h-3 bg-green-500/60 rounded" /> Entrées</span>
+              <span className="flex items-center gap-1"><div className="w-3 h-3 bg-red-500/60 rounded" /> Sorties</span>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Top Assets */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div>
+          <h2 className="text-lg font-semibold mb-3 text-zinc-300">Top 10 Holdings par Valeur</h2>
+          <Card>
+            <CardContent className="pt-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Asset</TableHead>
+                    <TableHead className="text-right">Quantité</TableHead>
+                    <TableHead className="text-right">Valeur EUR</TableHead>
+                    <TableHead className="text-right">P&L</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {topAssets.map((asset) => (
+                    <TableRow key={asset.asset} className="text-zinc-100">
+                      <TableCell className="font-medium text-zinc-100">{asset.asset}</TableCell>
+                      <TableCell className="text-right font-mono text-zinc-100">{asset.current_holdings.toLocaleString()}</TableCell>
+                      <TableCell className="text-right text-zinc-100">€{asset.current_value_eur.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</TableCell>
+                      <TableCell className={`text-right font-mono ${asset.realized_pnl_eur >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                        {asset.realized_pnl_eur >= 0 ? '+' : ''}€{asset.realized_pnl_eur.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Répartition par type de position */}
+        <div>
+          <h2 className="text-lg font-semibold mb-3 text-zinc-300">Positions par Plateforme</h2>
+          <Card>
+            <CardContent className="pt-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Plateforme</TableHead>
+                    <TableHead>Type</TableHead>
+                    <TableHead className="text-right">Capital</TableHead>
+                    <TableHead className="text-right">Rendement</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {positions.slice(0, 10).map((pos) => (
+                    <TableRow key={pos.id} className="text-zinc-100">
+                      <TableCell className="font-medium text-zinc-100">{pos.platform}</TableCell>
+                      <TableCell className="text-zinc-100">{pos.product_type}</TableCell>
+                      <TableCell className="text-right font-mono text-zinc-100">{pos.amount?.toFixed(2)} {pos.asset}</TableCell>
+                      <TableCell className="text-right font-mono text-green-400">+{(pos.realized_yield || 0).toFixed(2)}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+
+      {/* Statistiques */}
+      <div className="mt-6">
+        <h2 className="text-lg font-semibold mb-3 text-zinc-300">Statistiques Globales</h2>
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+          <Card>
+            <CardContent className="pt-4 text-center">
+              <div className="text-3xl font-bold text-zinc-100">{transactions.length}</div>
+              <div className="text-sm text-zinc-500">Transactions</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 text-center">
+              <div className="text-3xl font-bold text-zinc-100">{pnlData.reports?.length || 0}</div>
+              <div className="text-sm text-zinc-500">Actifs Crypto</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 text-center">
+              <div className="text-3xl font-bold text-zinc-100">{positions.length}</div>
+              <div className="text-sm text-zinc-500">Positions</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 text-center">
+              <div className="text-3xl font-bold text-zinc-100">{fiatAccounts.length}</div>
+              <div className="text-sm text-zinc-500">Comptes Fiat</div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-4 text-center">
+              <div className="text-3xl font-bold text-amber-400">€{totalFees.toFixed(2)}</div>
+              <div className="text-sm text-zinc-500">Total Frais</div>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </div>
   );
