@@ -10,7 +10,7 @@ Application de suivi de portefeuille crypto-fiat "emerGcrypTrac" avec les foncti
 - Exclusion des transactions spam des rapports
 
 ## Application Access
-- **URL**: https://fiat-ledger-app.preview.emergentagent.com
+- **URL**: https://asset-movement-suite.preview.emergentagent.com
 - **Test User**: fiatdemo / FiatDemo123
 
 ## Tech Stack
