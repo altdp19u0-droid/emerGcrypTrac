@@ -2585,6 +2585,187 @@ async def delete_position(position_id: str, current_user: dict = Depends(get_cur
     await db.position_movements.delete_many({"position_id": position_id, "user_id": current_user["id"]})
     return {"message": "Position deleted"}
 
+# ==================== RÈGLES D'AFFECTATION AUTOMATIQUE ====================
+
+@api_router.post("/positions/{position_id}/apply-rules")
+async def apply_position_rules(position_id: str, current_user: dict = Depends(get_current_user)):
+    """Apply position rules to match existing transactions and create movements"""
+    user_id = current_user["id"]
+    
+    # Get the position
+    position = await db.positions.find_one({"id": position_id, "user_id": user_id}, {"_id": 0})
+    if not position:
+        raise HTTPException(status_code=404, detail="Position not found")
+    
+    if not position.get("rule_enabled"):
+        return {"message": "Règles non activées pour cette position", "matched": 0}
+    
+    rule_address = position.get("rule_address", "").lower().strip()
+    rule_asset = position.get("rule_asset", "").strip()
+    
+    if not rule_address and not rule_asset:
+        return {"message": "Aucune règle définie", "matched": 0}
+    
+    # Build query to find matching transactions
+    query = {"user_id": user_id, "linked_position_id": {"$exists": False}}
+    
+    # Both address AND asset must match if both are defined
+    if rule_address and rule_asset:
+        query["$and"] = [
+            {"$or": [
+                {"counterparty_wallet": {"$regex": rule_address, "$options": "i"}},
+                {"tx_hash": {"$regex": rule_address, "$options": "i"}}
+            ]},
+            {"asset": rule_asset}
+        ]
+    elif rule_address:
+        query["$or"] = [
+            {"counterparty_wallet": {"$regex": rule_address, "$options": "i"}},
+            {"tx_hash": {"$regex": rule_address, "$options": "i"}}
+        ]
+    elif rule_asset:
+        query["asset"] = rule_asset
+    
+    # Find matching transactions (Transfer Out = dépôt vers position)
+    query["type"] = {"$in": ["Transfer Out", "Sell"]}
+    
+    matching_txs = await db.transactions.find(query, {"_id": 0}).to_list(1000)
+    
+    created_movements = 0
+    linked_transactions = 0
+    
+    for tx in matching_txs:
+        # Check if movement already exists for this transaction
+        existing_mov = await db.position_movements.find_one({
+            "position_id": position_id,
+            "linked_tx_id": tx.get("id")
+        })
+        
+        if existing_mov:
+            continue
+        
+        # Create movement (capital withdrawal to position = dépôt)
+        amount = abs(tx.get("amount", 0))
+        mov = PositionMovement(
+            user_id=user_id,
+            position_id=position_id,
+            movement_type="capital_deposit",  # Nouveau type pour dépôt
+            amount=amount,
+            asset=tx.get("asset", position.get("asset")),
+            date=tx.get("date", datetime.now(timezone.utc).isoformat()),
+            tx_hash=tx.get("tx_hash", ""),
+            notes=f"Auto-affecté depuis {tx.get('wallet_name', 'wallet')}",
+            linked_tx_id=tx.get("id")
+        )
+        await db.position_movements.insert_one(mov.model_dump())
+        created_movements += 1
+        
+        # Link transaction to position
+        await db.transactions.update_one(
+            {"id": tx.get("id")},
+            {"$set": {"linked_position_id": position_id}}
+        )
+        linked_transactions += 1
+    
+    # Also find Transfer In (rendements reçus de la position)
+    query_in = {"user_id": user_id, "linked_position_id": {"$exists": False}, "type": "Transfer In"}
+    if rule_address and rule_asset:
+        query_in["$and"] = [
+            {"$or": [
+                {"counterparty_wallet": {"$regex": rule_address, "$options": "i"}},
+                {"tx_hash": {"$regex": rule_address, "$options": "i"}}
+            ]},
+            {"asset": rule_asset}
+        ]
+    elif rule_address:
+        query_in["$or"] = [
+            {"counterparty_wallet": {"$regex": rule_address, "$options": "i"}},
+            {"tx_hash": {"$regex": rule_address, "$options": "i"}}
+        ]
+    elif rule_asset:
+        query_in["asset"] = rule_asset
+    
+    matching_in_txs = await db.transactions.find(query_in, {"_id": 0}).to_list(1000)
+    
+    for tx in matching_in_txs:
+        existing_mov = await db.position_movements.find_one({
+            "position_id": position_id,
+            "linked_tx_id": tx.get("id")
+        })
+        
+        if existing_mov:
+            continue
+        
+        amount = abs(tx.get("amount", 0))
+        mov = PositionMovement(
+            user_id=user_id,
+            position_id=position_id,
+            movement_type="yield_realized",  # Rendement reçu
+            amount=amount,
+            asset=tx.get("asset", position.get("asset")),
+            date=tx.get("date", datetime.now(timezone.utc).isoformat()),
+            tx_hash=tx.get("tx_hash", ""),
+            notes=f"Rendement auto-affecté depuis {tx.get('wallet_name', 'wallet')}",
+            linked_tx_id=tx.get("id")
+        )
+        await db.position_movements.insert_one(mov.model_dump())
+        created_movements += 1
+        
+        await db.transactions.update_one(
+            {"id": tx.get("id")},
+            {"$set": {"linked_position_id": position_id}}
+        )
+        linked_transactions += 1
+    
+    return {
+        "message": f"Règles appliquées: {created_movements} mouvements créés, {linked_transactions} transactions liées",
+        "created_movements": created_movements,
+        "linked_transactions": linked_transactions
+    }
+
+@api_router.get("/positions/{position_id}/preview-rules")
+async def preview_position_rules(position_id: str, current_user: dict = Depends(get_current_user)):
+    """Preview which transactions would match the position rules without applying them"""
+    user_id = current_user["id"]
+    
+    position = await db.positions.find_one({"id": position_id, "user_id": user_id}, {"_id": 0})
+    if not position:
+        raise HTTPException(status_code=404, detail="Position not found")
+    
+    rule_address = position.get("rule_address", "").lower().strip()
+    rule_asset = position.get("rule_asset", "").strip()
+    
+    if not rule_address and not rule_asset:
+        return {"matching_transactions": [], "count": 0}
+    
+    # Build query
+    query = {"user_id": user_id}
+    
+    if rule_address and rule_asset:
+        query["$and"] = [
+            {"$or": [
+                {"counterparty_wallet": {"$regex": rule_address, "$options": "i"}},
+                {"tx_hash": {"$regex": rule_address, "$options": "i"}}
+            ]},
+            {"asset": rule_asset}
+        ]
+    elif rule_address:
+        query["$or"] = [
+            {"counterparty_wallet": {"$regex": rule_address, "$options": "i"}},
+            {"tx_hash": {"$regex": rule_address, "$options": "i"}}
+        ]
+    elif rule_asset:
+        query["asset"] = rule_asset
+    
+    matching_txs = await db.transactions.find(query, {"_id": 0}).sort("date", -1).to_list(50)
+    
+    return {
+        "matching_transactions": matching_txs,
+        "count": len(matching_txs),
+        "rule_address": rule_address,
+        "rule_asset": rule_asset
+    }
+
 # ==================== POSITION MOVEMENTS ENDPOINTS ====================
 
 @api_router.post("/position-movements", response_model=dict)
