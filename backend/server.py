@@ -1820,6 +1820,8 @@ async def create_fiat_transaction(tx_data: FiatTransactionCreate, current_user: 
     elif tx_dict.get("source_type") == "wallet" and tx_dict.get("source_wallet_id"):
         source_wallet = await db.wallets.find_one({"id": tx_dict["source_wallet_id"]}, {"_id": 0})
         source_name = source_wallet["name"] if source_wallet else tx_dict.get("source_wallet_address", "Wallet inconnu")
+    elif tx_dict.get("source_type") == "exchange":
+        source_name = tx_dict.get("source_wallet_address") or "Exchange"
     elif tx_dict.get("source_type") == "external":
         source_name = tx_dict.get("source_wallet_address") or "Externe"
     tx_dict["source_name"] = source_name
@@ -1832,6 +1834,8 @@ async def create_fiat_transaction(tx_data: FiatTransactionCreate, current_user: 
     elif tx_dict.get("dest_type") == "wallet" and tx_dict.get("dest_wallet_id"):
         dest_wallet = await db.wallets.find_one({"id": tx_dict["dest_wallet_id"]}, {"_id": 0})
         dest_name = dest_wallet["name"] if dest_wallet else tx_dict.get("dest_wallet_address", "Wallet inconnu")
+    elif tx_dict.get("dest_type") == "exchange":
+        dest_name = tx_dict.get("dest_wallet_address") or "Exchange"
     elif tx_dict.get("dest_type") == "external":
         dest_name = tx_dict.get("dest_wallet_address") or "Externe"
     tx_dict["dest_name"] = dest_name
