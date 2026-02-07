@@ -1630,7 +1630,7 @@ async def get_transactions(
     include_fiat: bool = False,  # Include fiat transactions
     fiat_account_ids: Optional[str] = None,  # Comma-separated fiat account IDs
     page: int = Query(1, ge=1),
-    page_size: int = Query(50, ge=1, le=200),
+    page_size: int = Query(50, ge=1, le=10000),
     current_user: dict = Depends(get_current_user)
 ):
     """Get transactions with pagination and filters (supports multi-select and fiat)"""
