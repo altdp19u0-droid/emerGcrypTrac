@@ -235,6 +235,10 @@ class TransactionCreate(BaseModel):
     date: str
     tx_hash: Optional[str] = None
     counterparty_wallet: Optional[str] = None
+    notes: str = ""
+    # Interdépendance Crypto ↔ Crypto
+    target_wallet_id: Optional[str] = None  # Wallet destinataire pour transferts internes
+    create_counterpart_tx: bool = False  # Créer automatiquement la transaction contrepartie
 
 class Transaction(BaseModel):
     model_config = ConfigDict(extra="ignore")
