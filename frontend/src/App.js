@@ -2919,6 +2919,41 @@ const PositionsPage = () => {
               />
             </div>
             
+            {/* Interdépendance: Wallet Cible pour les rendements et retraits */}
+            {(newMovement.movement_type === "yield_realized" || newMovement.movement_type === "capital_withdrawal") && (
+              <div className="border-t pt-4 mt-2">
+                <Label className="text-sm text-muted-foreground mb-2 block">Interdépendance (optionnel)</Label>
+                <div className="space-y-3">
+                  <div>
+                    <Label>Wallet Destinataire</Label>
+                    <Select value={newMovement.target_wallet_id} onValueChange={(v) => setNewMovement({...newMovement, target_wallet_id: v})}>
+                      <SelectTrigger><SelectValue placeholder="Sélectionner le wallet destinataire..." /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="">Aucun</SelectItem>
+                        {wallets.map(w => (
+                          <SelectItem key={w.id} value={w.id}>{w.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {newMovement.target_wallet_id && (
+                    <div className="flex items-center space-x-2">
+                      <input 
+                        type="checkbox" 
+                        id="create_deposit_tx"
+                        checked={newMovement.create_deposit_tx}
+                        onChange={(e) => setNewMovement({...newMovement, create_deposit_tx: e.target.checked})}
+                        className="rounded"
+                      />
+                      <Label htmlFor="create_deposit_tx" className="text-sm cursor-pointer">
+                        Créer automatiquement une transaction de dépôt dans le wallet
+                      </Label>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+            
             <Button onClick={handleCreateMovement} className="w-full">Enregistrer le Mouvement</Button>
           </div>
         </DialogContent>
