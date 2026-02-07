@@ -4559,7 +4559,7 @@ const ReportsPage = () => {
       try {
         const [pnlRes, txRes, posRes, fiatRes] = await Promise.all([
           api.get("/portfolio/pnl"),
-          api.get("/transactions", { params: { page_size: 5000, hide_spam: true } }),
+          api.get("/transactions", { params: { page_size: 200, hide_spam: true } }),
           api.get("/positions"),
           api.get("/fiat-accounts")
         ]);
