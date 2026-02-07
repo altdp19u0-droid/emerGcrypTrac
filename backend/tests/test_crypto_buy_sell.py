@@ -61,7 +61,11 @@ class TestCryptoBuySellFeature:
         """Get fiat transactions for a specific account"""
         response = requests.get(f"{BASE_URL}/api/fiat-transactions?account_id={account_id}", headers=auth_headers)
         assert response.status_code == 200
-        return response.json()
+        data = response.json()
+        # API returns object with 'transactions' key
+        if isinstance(data, dict) and "transactions" in data:
+            return data["transactions"]
+        return data
     
     def get_crypto_transactions(self, auth_headers, wallet_id=None):
         """Get crypto transactions, optionally filtered by wallet"""
