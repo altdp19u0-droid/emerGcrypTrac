@@ -2469,13 +2469,74 @@ const PositionsPage = () => {
     }
   };
 
+  // ==================== RÈGLES D'AFFECTATION ====================
+  
+  // Ouvrir le dialog des règles
+  const openRulesDialog = (pos) => {
+    setSelectedPositionForRules(pos);
+    setPreviewResults(null);
+    setRulesDialogOpen(true);
+  };
+
+  // Prévisualiser les transactions qui matchent
+  const handlePreviewRules = async () => {
+    if (!selectedPositionForRules) return;
+    try {
+      const response = await api.get(`/positions/${selectedPositionForRules.id}/preview-rules`);
+      setPreviewResults(response.data);
+    } catch (error) {
+      toast.error("Erreur lors de la prévisualisation");
+    }
+  };
+
+  // Appliquer les règles
+  const handleApplyRules = async () => {
+    if (!selectedPositionForRules) return;
+    setApplyingRules(true);
+    try {
+      const response = await api.post(`/positions/${selectedPositionForRules.id}/apply-rules`);
+      toast.success(response.data.message);
+      setRulesDialogOpen(false);
+      fetchPositions();
+    } catch (error) {
+      toast.error("Erreur lors de l'application des règles");
+    } finally {
+      setApplyingRules(false);
+    }
+  };
+
+  // Mettre à jour les règles d'une position
+  const handleUpdateRules = async (ruleAddress, ruleAsset, ruleEnabled) => {
+    if (!selectedPositionForRules) return;
+    try {
+      await api.put(`/positions/${selectedPositionForRules.id}`, {
+        rule_address: ruleAddress,
+        rule_asset: ruleAsset,
+        rule_enabled: ruleEnabled
+      });
+      toast.success("Règles mises à jour");
+      // Update local state
+      setSelectedPositionForRules({
+        ...selectedPositionForRules,
+        rule_address: ruleAddress,
+        rule_asset: ruleAsset,
+        rule_enabled: ruleEnabled
+      });
+      fetchPositions();
+    } catch (error) {
+      toast.error("Erreur lors de la mise à jour");
+    }
+  };
+
   const getMovementTypeLabel = (value) => {
     const mt = movementTypes.find(m => m.value === value);
+    if (value === "capital_deposit") return "Dépôt Capital";
     return mt ? mt.label : value;
   };
 
   const getMovementTypeColor = (value) => {
     const mt = movementTypes.find(m => m.value === value);
+    if (value === "capital_deposit") return "text-purple-400";
     return mt ? mt.color : "text-gray-400";
   };
 
