@@ -2259,17 +2259,17 @@ const PnLPage = () => {
             </TableHeader>
             <TableBody>
               {pnlData.reports.map((report) => (
-                <TableRow key={report.asset}>
-                  <TableCell className="font-medium">{report.asset}</TableCell>
-                  <TableCell>{report.total_bought.toLocaleString()}</TableCell>
-                  <TableCell>{report.total_sold.toLocaleString()}</TableCell>
-                  <TableCell>€{report.total_cost_eur.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</TableCell>
-                  <TableCell>€{report.total_proceeds_eur.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</TableCell>
+                <TableRow key={report.asset} className="text-zinc-100">
+                  <TableCell className="font-medium text-zinc-100">{report.asset}</TableCell>
+                  <TableCell className="text-zinc-100">{report.total_bought.toLocaleString()}</TableCell>
+                  <TableCell className="text-zinc-100">{report.total_sold.toLocaleString()}</TableCell>
+                  <TableCell className="text-zinc-100">€{report.total_cost_eur.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</TableCell>
+                  <TableCell className="text-zinc-100">€{report.total_proceeds_eur.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</TableCell>
                   <TableCell className={report.realized_pnl_eur >= 0 ? "text-green-400" : "text-red-400"}>
                     €{report.realized_pnl_eur.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
                   </TableCell>
-                  <TableCell>{report.current_holdings.toLocaleString()}</TableCell>
-                  <TableCell>€{report.current_value_eur.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</TableCell>
+                  <TableCell className="text-zinc-100">{report.current_holdings.toLocaleString()}</TableCell>
+                  <TableCell className="text-zinc-100">€{report.current_value_eur.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}</TableCell>
                   <TableCell className={report.unrealized_pnl_eur >= 0 ? "text-green-400" : "text-red-400"}>
                     €{report.unrealized_pnl_eur.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
                   </TableCell>
