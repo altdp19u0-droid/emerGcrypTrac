@@ -405,6 +405,8 @@ class Position(BaseModel):
     deposit_date: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     unlock_date: Optional[str] = None
     notes: str = ""
+    source_wallet_id: Optional[str] = None  # Wallet source lié
+    linked_tx_id: Optional[str] = None  # Transaction de retrait liée
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 class PositionUpdate(BaseModel):
