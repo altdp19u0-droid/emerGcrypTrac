@@ -2366,23 +2366,25 @@ const PositionsPage = () => {
       asset: pos.asset,
       date: new Date().toISOString().split("T")[0],
       tx_hash: "",
-      notes: ""
+      notes: "",
+      target_wallet_id: "",
+      create_deposit_tx: false
     });
     setMovementDialogOpen(true);
   };
 
-  // Créer un mouvement
+  // Créer un mouvement avec interdépendance optionnelle
   const handleCreateMovement = async () => {
     if (!selectedPositionForMovement || !newMovement.amount) {
       toast.error("Montant requis");
       return;
     }
     try {
-      await api.post("/position-movements", {
+      const response = await api.post("/position-movements", {
         position_id: selectedPositionForMovement.id,
         ...newMovement
       });
-      toast.success("Mouvement enregistré");
+      toast.success(response.data.message || "Mouvement enregistré");
       setMovementDialogOpen(false);
       setSelectedPositionForMovement(null);
       fetchPositions();
