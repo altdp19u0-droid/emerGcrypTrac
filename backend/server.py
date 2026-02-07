@@ -256,6 +256,10 @@ class Transaction(BaseModel):
     tx_hash: Optional[str] = None
     counterparty_wallet: Optional[str] = None
     is_spam: bool = False
+    notes: str = ""
+    linked_position_id: Optional[str] = None  # Lien vers position pour interdépendance
+    linked_movement_id: Optional[str] = None  # Lien vers mouvement de position
+    linked_tx_id: Optional[str] = None  # Lien vers transaction crypto contrepartie
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 class TransactionUpdate(BaseModel):
