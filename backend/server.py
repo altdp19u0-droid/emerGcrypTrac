@@ -429,6 +429,8 @@ class PositionMovementCreate(BaseModel):
     date: Optional[str] = None
     tx_hash: Optional[str] = None  # Hash de transaction si on-chain
     notes: str = ""
+    target_wallet_id: Optional[str] = None  # Wallet destinataire pour interdépendance
+    create_deposit_tx: bool = False  # Créer une transaction de dépôt dans le wallet
 
 class PositionMovement(BaseModel):
     model_config = ConfigDict(extra="ignore")
