@@ -2459,6 +2459,24 @@ const PositionsPage = () => {
     return pt ? pt.label : value;
   };
 
+  // Export positions
+  const exportPositions = async () => {
+    try {
+      const response = await api.get("/export/positions", { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'positions.csv';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      toast.success("Export des positions téléchargé");
+    } catch (error) {
+      toast.error("Erreur lors de l'export");
+    }
+  };
+
   if (loading) return <div className="page-content"><RefreshCw className="animate-spin" /></div>;
 
   return (
@@ -2468,10 +2486,15 @@ const PositionsPage = () => {
           <h1 className="page-title">Positions / Investissements</h1>
           <p className="page-subtitle">Gérez vos actifs en épargne, vault, stratégie</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button data-testid="add-position-btn"><Plus size={16} className="mr-2" />Nouvelle Position</Button>
-          </DialogTrigger>
+        <div className="header-actions">
+          <Button variant="outline" onClick={exportPositions}>
+            <Download size={16} className="mr-2" />
+            Export CSV
+          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button data-testid="add-position-btn"><Plus size={16} className="mr-2" />Nouvelle Position</Button>
+            </DialogTrigger>
           <DialogContent className="max-w-lg">
             <DialogHeader><DialogTitle>Ajouter une Position</DialogTitle></DialogHeader>
             <div className="space-y-4">
