@@ -3077,15 +3077,15 @@ const PositionsPage = () => {
               />
             </div>
             
-            {/* Interdépendance: Wallet Cible pour les rendements et retraits */}
-            {(newMovement.movement_type === "yield_realized" || newMovement.movement_type === "capital_withdrawal") && (
+            {/* Interdépendance: Wallet pour les mouvements de capital et rendements */}
+            {(newMovement.movement_type === "yield_realized" || newMovement.movement_type === "capital_withdrawal" || newMovement.movement_type === "capital_addition") && (
               <div className="border-t pt-4 mt-2">
                 <Label className="text-sm text-muted-foreground mb-2 block">Interdépendance (optionnel)</Label>
                 <div className="space-y-3">
                   <div>
-                    <Label>Wallet Destinataire</Label>
+                    <Label>{newMovement.movement_type === "capital_addition" ? "Wallet Source" : "Wallet Destinataire"}</Label>
                     <Select value={newMovement.target_wallet_id} onValueChange={(v) => setNewMovement({...newMovement, target_wallet_id: v})}>
-                      <SelectTrigger><SelectValue placeholder="Sélectionner le wallet destinataire..." /></SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder={newMovement.movement_type === "capital_addition" ? "Sélectionner le wallet source..." : "Sélectionner le wallet destinataire..."} /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">Aucun</SelectItem>
                         {wallets.map(w => (
