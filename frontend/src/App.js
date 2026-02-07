@@ -2300,6 +2300,10 @@ const PositionsPage = () => {
   const [movementsDialogOpen, setMovementsDialogOpen] = useState(false);
   const [selectedPositionMovements, setSelectedPositionMovements] = useState([]);
   const [wallets, setWallets] = useState([]);  // Pour interdépendance
+  const [rulesDialogOpen, setRulesDialogOpen] = useState(false);
+  const [selectedPositionForRules, setSelectedPositionForRules] = useState(null);
+  const [previewResults, setPreviewResults] = useState(null);
+  const [applyingRules, setApplyingRules] = useState(false);
   const [newPosition, setNewPosition] = useState({
     platform: "",
     product_type: "savings",
