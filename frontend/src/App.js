@@ -1459,6 +1459,11 @@ const TransactionsPage = () => {
             </DialogContent>
           </Dialog>
           
+          <Button variant="outline" onClick={handleExportTransactionsCSV} data-testid="export-transactions-csv-btn">
+            <Download size={16} className="mr-2" />
+            Export CSV
+          </Button>
+          
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button data-testid="add-transaction-btn">
