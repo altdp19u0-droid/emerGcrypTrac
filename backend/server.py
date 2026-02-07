@@ -2508,7 +2508,7 @@ async def delete_position(position_id: str, current_user: dict = Depends(get_cur
 
 @api_router.post("/position-movements", response_model=dict)
 async def create_position_movement(movement: PositionMovementCreate, current_user: dict = Depends(get_current_user)):
-    """Create a new movement for a position (yield, withdrawal, loss)"""
+    """Create a new movement for a position (yield, withdrawal, loss) with optional wallet interdependence"""
     # Verify position exists and belongs to user
     position = await db.positions.find_one({"id": movement.position_id, "user_id": current_user["id"]}, {"_id": 0})
     if not position:
@@ -2516,10 +2516,51 @@ async def create_position_movement(movement: PositionMovementCreate, current_use
     
     mov_dict = movement.model_dump()
     mov_dict["date"] = mov_dict.get("date") or datetime.now(timezone.utc).isoformat()
+    
+    # Remove non-model fields
+    create_deposit_tx = mov_dict.pop("create_deposit_tx", False)
+    target_wallet_id = mov_dict.get("target_wallet_id")
+    
+    linked_tx_id = None
+    linked_tx_message = ""
+    
+    # Interdépendance: Créer une transaction de dépôt dans le wallet cible
+    if create_deposit_tx and target_wallet_id and movement.movement_type in ["yield_realized", "capital_withdrawal"]:
+        # Vérifier que le wallet existe
+        wallet = await db.wallets.find_one({"id": target_wallet_id, "user_id": current_user["id"]}, {"_id": 0})
+        if wallet:
+            # Créer une transaction de dépôt (Transfer In)
+            movement_type_label = "Rendement" if movement.movement_type == "yield_realized" else "Retrait capital"
+            deposit_tx = Transaction(
+                user_id=current_user["id"],
+                wallet_id=target_wallet_id,
+                type="Transfer In",
+                asset=movement.asset,
+                amount=abs(movement.amount),  # Positif pour un dépôt
+                date=mov_dict["date"],
+                tx_hash=movement.tx_hash or "",
+                price_eur=0,
+                value_eur=0,
+                notes=f"{movement_type_label} de position {position.get('platform', '')} - {position.get('product_type', '')}",
+                linked_position_id=movement.position_id
+            )
+            deposit_doc = deposit_tx.model_dump()
+            await db.transactions.insert_one(deposit_doc)
+            linked_tx_id = deposit_tx.id
+            linked_tx_message = " + transaction de dépôt créée dans le wallet"
+            
+            # Ajouter l'ID de la transaction liée au mouvement
+            mov_dict["linked_tx_id"] = linked_tx_id
+    
     mov = PositionMovement(user_id=current_user["id"], **mov_dict)
     doc = mov.model_dump()
     await db.position_movements.insert_one(doc)
-    return {"id": mov.id, "message": "Movement created"}
+    
+    return {
+        "id": mov.id, 
+        "message": f"Mouvement créé{linked_tx_message}",
+        "linked_tx_id": linked_tx_id
+    }
 
 @api_router.get("/position-movements")
 async def get_position_movements(position_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
