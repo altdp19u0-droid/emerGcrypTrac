@@ -343,6 +343,7 @@ class FiatTransaction(BaseModel):
     description: str = ""
     account_id: str
     related_tx_id: Optional[str] = None
+    linked_tx_id: Optional[str] = None  # ID de la transaction liée (contrepartie)
     date: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
     # Source (origine)
     source_type: str = "bank"
