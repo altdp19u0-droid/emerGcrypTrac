@@ -2911,16 +2911,75 @@ async def get_movements_for_position(position_id: str, current_user: dict = Depe
     ).to_list(1000)
     
     # Calculate totals
-    total_yield = sum(m.get("amount", 0) for m in movements if m.get("movement_type") == "yield_realized")
+    total_addition = sum(m.get("amount", 0) for m in movements if m.get("movement_type") == "capital_addition")
+    total_yield = sum(m.get("amount", 0) for m in movements if m.get("movement_type") in ["yield_realized", "capital_deposit"])
     total_withdrawal = sum(m.get("amount", 0) for m in movements if m.get("movement_type") == "capital_withdrawal")
     total_loss = sum(m.get("amount", 0) for m in movements if m.get("movement_type") == "impermanent_loss")
     
     return {
         "movements": movements,
+        "total_capital_added": total_addition,
         "total_yield_realized": total_yield,
         "total_capital_withdrawn": total_withdrawal,
         "total_loss": total_loss
     }
+
+@api_router.get("/export/position-movements")
+async def export_position_movements_csv(position_id: Optional[str] = None, current_user: dict = Depends(get_current_user)):
+    """Export position movements to CSV"""
+    from fastapi.responses import StreamingResponse
+    import io
+    
+    query = {"user_id": current_user["id"]}
+    if position_id:
+        query["position_id"] = position_id
+    
+    movements = await db.position_movements.find(query, {"_id": 0}).sort("date", -1).to_list(10000)
+    
+    # Get position details for context
+    positions_cache = {}
+    for mov in movements:
+        pos_id = mov.get("position_id")
+        if pos_id and pos_id not in positions_cache:
+            pos = await db.positions.find_one({"id": pos_id}, {"_id": 0})
+            if pos:
+                positions_cache[pos_id] = pos
+    
+    # Build CSV
+    output = io.StringIO()
+    headers = ["Date", "Position", "Plateforme", "Type Produit", "Type Mouvement", "Asset", "Montant", "TX Hash", "Notes"]
+    output.write(",".join(headers) + "\n")
+    
+    movement_type_labels = {
+        "capital_addition": "Ajout Capital",
+        "yield_realized": "Rendement Réalisé",
+        "capital_withdrawal": "Retrait Capital",
+        "capital_deposit": "Dépôt Capital (auto)",
+        "impermanent_loss": "Perte"
+    }
+    
+    for mov in movements:
+        pos = positions_cache.get(mov.get("position_id"), {})
+        row = [
+            mov.get("date", "")[:10],
+            f"{pos.get('platform', 'N/A')} - {pos.get('product_type', 'N/A')}",
+            pos.get("platform", "N/A"),
+            pos.get("product_type", "N/A"),
+            movement_type_labels.get(mov.get("movement_type", ""), mov.get("movement_type", "")),
+            mov.get("asset", ""),
+            str(mov.get("amount", 0)),
+            mov.get("tx_hash", ""),
+            mov.get("notes", "").replace(",", ";").replace("\n", " ")
+        ]
+        output.write(",".join([f'"{v}"' for v in row]) + "\n")
+    
+    output.seek(0)
+    
+    return StreamingResponse(
+        iter([output.getvalue()]),
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=position_movements_{datetime.now().strftime('%Y%m%d')}.csv"}
+    )
 
 @api_router.put("/position-movements/{movement_id}")
 async def update_position_movement(movement_id: str, mov_data: PositionMovementUpdate, current_user: dict = Depends(get_current_user)):
