@@ -1945,6 +1945,16 @@ const TransactionsPage = () => {
                       ? (tx.credit > 0 ? <span className="text-green-400">{tx.credit?.toFixed(2)}</span> : "-")
                       : `€${tx.value_eur?.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}`}
                   </TableCell>
+                  {/* Fees */}
+                  <TableCell className="text-amber-400 font-mono text-sm">
+                    {tx.fees > 0 ? (
+                      <span title={`${tx.fees} ${tx.fees_currency || 'EUR'}`}>
+                        {tx.fees < 0.0001 ? tx.fees.toExponential(2) : tx.fees.toFixed(4)} {tx.fees_currency || 'EUR'}
+                      </span>
+                    ) : (
+                      <span className="text-zinc-500">-</span>
+                    )}
+                  </TableCell>
                   {/* Source (Wallet/Counterparty for crypto, source_name for fiat) */}
                   <TableCell>
                     {tx.tx_category === "fiat" ? (
