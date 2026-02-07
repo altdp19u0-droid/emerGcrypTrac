@@ -264,6 +264,8 @@ class Transaction(BaseModel):
     linked_position_id: Optional[str] = None  # Lien vers position pour interdépendance
     linked_movement_id: Optional[str] = None  # Lien vers mouvement de position
     linked_tx_id: Optional[str] = None  # Lien vers transaction crypto contrepartie
+    # Catégorie de revenu/dépense pour classification fiscale
+    income_category: Optional[str] = None  # interest, yield, airdrop, reward, cashback, fee, gas, subscription, payment
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 class TransactionUpdate(BaseModel):
@@ -279,6 +281,7 @@ class TransactionUpdate(BaseModel):
     fees_currency: Optional[str] = None
     date: Optional[str] = None
     counterparty_wallet: Optional[str] = None
+    income_category: Optional[str] = None  # Catégorie de revenu/dépense
 
 # ==================== ADDRESS CLASSIFICATION ====================
 
