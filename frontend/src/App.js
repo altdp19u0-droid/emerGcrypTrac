@@ -2390,7 +2390,7 @@ const PositionsPage = () => {
         deposit_date: new Date().toISOString().split("T")[0],
         unlock_date: "",
         notes: "",
-        source_wallet_id: "",
+        source_wallet_id: "none",
         create_withdrawal_tx: false
       });
       fetchPositions();
