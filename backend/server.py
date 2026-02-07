@@ -341,6 +341,9 @@ class FiatTransactionCreate(BaseModel):
     dest_account_id: Optional[str] = None  # ID du compte fiat si bank
     dest_wallet_id: Optional[str] = None  # ID du wallet si wallet
     dest_wallet_address: Optional[str] = None  # Adresse du wallet
+    # Crypto conversion fields (for crypto_buy/crypto_sell)
+    crypto_asset: Optional[str] = None  # EURC, EURA, USDC, etc.
+    crypto_amount: Optional[float] = None  # Amount of crypto bought/sold
 
 class FiatTransaction(BaseModel):
     model_config = ConfigDict(extra="ignore")
