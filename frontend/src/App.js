@@ -3459,7 +3459,10 @@ const FiatPage = () => {
     dest_type: "bank",
     dest_account_id: "",
     dest_wallet_id: "",
-    dest_wallet_address: ""
+    dest_wallet_address: "",
+    // Crypto conversion (for crypto_buy/crypto_sell)
+    crypto_asset: "EURC",
+    crypto_amount: 0
   });
 
   const api = createAuthenticatedApi(accessToken);
