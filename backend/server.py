@@ -390,6 +390,8 @@ class PositionCreate(BaseModel):
     deposit_date: Optional[str] = None
     unlock_date: Optional[str] = None  # Date de déblocage (pour produits à terme)
     notes: str = ""
+    source_wallet_id: Optional[str] = None  # Wallet source pour interdépendance
+    create_withdrawal_tx: bool = False  # Créer une transaction de retrait dans le wallet source
 
 class Position(BaseModel):
     model_config = ConfigDict(extra="ignore")
