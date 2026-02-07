@@ -2055,9 +2055,20 @@ const TransactionsPage = () => {
                                   </DropdownMenu>
                                 </span>
                               </TooltipTrigger>
-                              <TooltipContent>
-                                <p className="font-mono text-xs">{tx.counterparty_wallet}</p>
-                                <p className="text-xs text-muted-foreground">Cliquez pour classifier</p>
+                              <TooltipContent side="top" className="bg-zinc-800 text-zinc-100 font-mono text-xs max-w-none">
+                                <div className="flex items-center gap-2">
+                                  <span>{tx.counterparty_wallet}</span>
+                                  <Copy 
+                                    size={12} 
+                                    className="cursor-pointer hover:text-blue-400 transition-colors" 
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      navigator.clipboard.writeText(tx.counterparty_wallet);
+                                      toast.success("Adresse copiée !");
+                                    }}
+                                  />
+                                </div>
+                                <p className="text-xs text-muted-foreground mt-1">Cliquez pour classifier</p>
                               </TooltipContent>
                             </Tooltip>
                           </TooltipProvider>
