@@ -3228,6 +3228,111 @@ const PositionsPage = () => {
           )}
         </DialogContent>
       </Dialog>
+
+      {/* Rules Dialog */}
+      <Dialog open={rulesDialogOpen} onOpenChange={setRulesDialogOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Règles d'Affectation Automatique</DialogTitle>
+          </DialogHeader>
+          {selectedPositionForRules && (
+            <div className="space-y-4">
+              <div className="p-3 bg-zinc-800 rounded-lg">
+                <p className="text-sm text-zinc-400">Position: <span className="text-white font-medium">{selectedPositionForRules.platform} - {selectedPositionForRules.product_type}</span></p>
+                <p className="text-sm text-zinc-400">Asset: <span className="text-white">{selectedPositionForRules.asset}</span></p>
+              </div>
+              
+              <div className="space-y-3">
+                <div>
+                  <Label>Adresse de contrepartie (partielle ou complète)</Label>
+                  <Input 
+                    value={selectedPositionForRules.rule_address || ""}
+                    onChange={(e) => setSelectedPositionForRules({...selectedPositionForRules, rule_address: e.target.value})}
+                    placeholder="0x1234... ou partie de l'adresse"
+                    className="font-mono text-sm"
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">Les transactions avec cette adresse seront matchées</p>
+                </div>
+                
+                <div>
+                  <Label>Asset à matcher</Label>
+                  <Input 
+                    value={selectedPositionForRules.rule_asset || ""}
+                    onChange={(e) => setSelectedPositionForRules({...selectedPositionForRules, rule_asset: e.target.value})}
+                    placeholder="EURA, USDC, 8LNDS..."
+                  />
+                  <p className="text-xs text-zinc-500 mt-1">Les transactions avec cet asset seront matchées</p>
+                </div>
+                
+                <div className="flex items-center space-x-2">
+                  <input 
+                    type="checkbox"
+                    id="rule_enabled"
+                    checked={selectedPositionForRules.rule_enabled || false}
+                    onChange={(e) => setSelectedPositionForRules({...selectedPositionForRules, rule_enabled: e.target.checked})}
+                    className="rounded"
+                  />
+                  <Label htmlFor="rule_enabled" className="cursor-pointer">Activer les règles d'affectation</Label>
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <Button 
+                  variant="outline" 
+                  onClick={() => handleUpdateRules(
+                    selectedPositionForRules.rule_address,
+                    selectedPositionForRules.rule_asset,
+                    selectedPositionForRules.rule_enabled
+                  )}
+                  className="flex-1"
+                >
+                  Sauvegarder les règles
+                </Button>
+                <Button 
+                  variant="outline"
+                  onClick={handlePreviewRules}
+                  className="flex-1"
+                >
+                  <Eye size={16} className="mr-2" />
+                  Prévisualiser
+                </Button>
+              </div>
+              
+              {previewResults && (
+                <div className="border rounded-lg p-3 space-y-2">
+                  <p className="text-sm font-medium">{previewResults.count} transaction(s) trouvée(s)</p>
+                  {previewResults.matching_transactions?.length > 0 && (
+                    <ScrollArea className="h-48">
+                      <div className="space-y-1">
+                        {previewResults.matching_transactions.slice(0, 20).map((tx, idx) => (
+                          <div key={idx} className="text-xs p-2 bg-zinc-800 rounded flex justify-between">
+                            <span className="text-zinc-400">{tx.date?.split("T")[0]}</span>
+                            <span className={tx.type === "Transfer Out" ? "text-red-400" : "text-green-400"}>{tx.type}</span>
+                            <span className="text-white">{tx.amount} {tx.asset}</span>
+                            <span className="text-zinc-500 truncate max-w-[150px]">{tx.counterparty_wallet || tx.wallet_name}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                </div>
+              )}
+              
+              <Button 
+                onClick={handleApplyRules}
+                disabled={!selectedPositionForRules.rule_enabled || applyingRules}
+                className="w-full"
+              >
+                {applyingRules ? "Application en cours..." : "Appliquer les règles maintenant"}
+              </Button>
+              
+              <p className="text-xs text-zinc-500 text-center">
+                Les Transfer Out seront convertis en "Dépôt Capital" et les Transfer In en "Rendement Réalisé"
+              </p>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
