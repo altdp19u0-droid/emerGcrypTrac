@@ -99,4 +99,7 @@ Application de suivi de portefeuille crypto-fiat "emerGcrypTrac" avec les foncti
 - `GET /api/export/fiscal-pdf` - PDF fiscal report
 
 ## Last Updated
-2026-02-07 - Fixed Total Fees text color visibility in P&L page
+2026-02-07 - Fixed Reports page displaying zeros (page_size validation limit increased from 200 to 10000)
+
+## Recent Bug Fixes
+- **Reports Page (2026-02-07)**: Fixed issue where all values showed €0,00. Root cause was the `/transactions` endpoint had a `page_size` limit of 200, but the Reports page requested 5000. Changed limit to 10000.
