@@ -2848,12 +2848,12 @@ const PositionsPage = () => {
                 </TableHeader>
                 <TableBody>
                   {positions.map((pos) => (
-                    <TableRow key={pos.id} className={pos.status === "loss" ? "bg-red-500/10" : pos.status === "closed" ? "bg-zinc-500/10" : ""}>
-                      <TableCell className="font-medium">{pos.platform}</TableCell>
+                    <TableRow key={pos.id} className={`text-zinc-100 ${pos.status === "loss" ? "bg-red-500/10" : pos.status === "closed" ? "bg-zinc-500/10" : ""}`}>
+                      <TableCell className="font-medium text-zinc-100">{pos.platform}</TableCell>
                       <TableCell>
                         <Badge variant="outline">{getProductTypeLabel(pos.product_type)}</Badge>
                       </TableCell>
-                      <TableCell className="font-mono">{pos.asset}</TableCell>
+                      <TableCell className="font-mono text-zinc-100">{pos.asset}</TableCell>
                       <TableCell className="text-right font-mono">
                         <div>{pos.amount?.toFixed(2)}</div>
                         {pos.capital_withdrawn > 0 && (
