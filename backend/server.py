@@ -2869,7 +2869,7 @@ async def create_position_movement(movement: PositionMovementCreate, current_use
     
     return {
         "id": mov.id, 
-        "message": f"Mouvement créé{linked_tx_message}",
+        "message": f"Mouvement créé{linked_tx_message}{position_update_message}",
         "linked_tx_id": linked_tx_id
     }
 
@@ -2884,8 +2884,10 @@ async def get_position_movements(position_id: Optional[str] = None, current_user
     
     # Group by type for summary
     summary = {
+        "capital_addition": {"count": 0, "total": 0},
         "yield_realized": {"count": 0, "total": 0},
         "capital_withdrawal": {"count": 0, "total": 0},
+        "capital_deposit": {"count": 0, "total": 0},
         "impermanent_loss": {"count": 0, "total": 0}
     }
     for mov in movements:
