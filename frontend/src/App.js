@@ -3288,29 +3288,39 @@ const FiatPage = () => {
           <h1 className="page-title">Comptes Fiat</h1>
           <p className="page-subtitle">Gérez vos comptes bancaires</p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button><Plus size={16} className="mr-2" />Ajouter Compte</Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader><DialogTitle>Ajouter un Compte Fiat</DialogTitle></DialogHeader>
-            <div className="space-y-4">
-              <div><Label>Nom</Label><Input value={newAccount.name} onChange={(e) => setNewAccount({...newAccount, name: e.target.value})} placeholder="Ma Banque" /></div>
-              <div><Label>Devise</Label>
-                <Select value={newAccount.currency} onValueChange={(v) => setNewAccount({...newAccount, currency: v})}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="EUR">EUR</SelectItem>
-                    <SelectItem value="USD">USD</SelectItem>
-                    <SelectItem value="CHF">CHF</SelectItem>
-                  </SelectContent>
-                </Select>
+        <div className="header-actions">
+          <Button variant="outline" onClick={exportFiatAccounts}>
+            <Download size={16} className="mr-2" />
+            Export Comptes
+          </Button>
+          <Button variant="outline" onClick={exportFiatTransactions}>
+            <Download size={16} className="mr-2" />
+            Export Transactions
+          </Button>
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button><Plus size={16} className="mr-2" />Ajouter Compte</Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader><DialogTitle>Ajouter un Compte Fiat</DialogTitle></DialogHeader>
+              <div className="space-y-4">
+                <div><Label>Nom</Label><Input value={newAccount.name} onChange={(e) => setNewAccount({...newAccount, name: e.target.value})} placeholder="Ma Banque" /></div>
+                <div><Label>Devise</Label>
+                  <Select value={newAccount.currency} onValueChange={(v) => setNewAccount({...newAccount, currency: v})}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="EUR">EUR</SelectItem>
+                      <SelectItem value="USD">USD</SelectItem>
+                      <SelectItem value="CHF">CHF</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div><Label>Solde Initial</Label><Input type="number" value={newAccount.initial_balance} onChange={(e) => setNewAccount({...newAccount, initial_balance: parseFloat(e.target.value) || 0})} /></div>
+                <Button onClick={handleCreateAccount} className="w-full">Créer le Compte</Button>
               </div>
-              <div><Label>Solde Initial</Label><Input type="number" value={newAccount.initial_balance} onChange={(e) => setNewAccount({...newAccount, initial_balance: parseFloat(e.target.value) || 0})} /></div>
-              <Button onClick={handleCreateAccount} className="w-full">Créer le Compte</Button>
-            </div>
-          </DialogContent>
-        </Dialog>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       <div className="fiat-layout">
