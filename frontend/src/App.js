@@ -3819,6 +3819,100 @@ const FiatPage = () => {
                               </div>
                             </div>
 
+                            {/* Crypto Conversion Fields - for crypto_buy/crypto_sell */}
+                            {["crypto_buy", "crypto_sell"].includes(newTransaction.type) && (
+                              <div className="p-3 bg-gradient-to-r from-purple-900/30 to-blue-900/30 border border-purple-500/30 rounded-lg space-y-3">
+                                <Label className="text-purple-400 flex items-center gap-2">
+                                  <Wallet size={16} />
+                                  {newTransaction.type === "crypto_buy" ? "Crypto Reçue" : "Crypto Vendue"}
+                                </Label>
+                                
+                                {/* Wallet selection */}
+                                <div>
+                                  <Label className="text-xs text-muted-foreground">
+                                    {newTransaction.type === "crypto_buy" ? "Wallet de destination" : "Wallet source"}
+                                  </Label>
+                                  {wallets.length > 0 ? (
+                                    <Select 
+                                      value={newTransaction.type === "crypto_buy" ? newTransaction.dest_wallet_id : newTransaction.source_wallet_id} 
+                                      onValueChange={(v) => {
+                                        const wallet = wallets.find(w => w.id === v);
+                                        if (newTransaction.type === "crypto_buy") {
+                                          setNewTransaction({...newTransaction, dest_type: "wallet", dest_wallet_id: v, dest_wallet_address: wallet?.address || ""});
+                                        } else {
+                                          setNewTransaction({...newTransaction, source_type: "wallet", source_wallet_id: v, source_wallet_address: wallet?.address || ""});
+                                        }
+                                      }}
+                                    >
+                                      <SelectTrigger><SelectValue placeholder="Sélectionner le wallet" /></SelectTrigger>
+                                      <SelectContent>
+                                        {wallets.map(w => (
+                                          <SelectItem key={w.id} value={w.id}>{w.name} ({w.network})</SelectItem>
+                                        ))}
+                                      </SelectContent>
+                                    </Select>
+                                  ) : (
+                                    <p className="text-sm text-amber-400">Aucun wallet crypto disponible. Créez d'abord un wallet.</p>
+                                  )}
+                                </div>
+                                
+                                {/* Crypto asset and amount */}
+                                <div className="grid grid-cols-2 gap-3">
+                                  <div>
+                                    <Label className="text-xs text-muted-foreground">Asset crypto</Label>
+                                    <Select value={newTransaction.crypto_asset} onValueChange={(v) => setNewTransaction({...newTransaction, crypto_asset: v})}>
+                                      <SelectTrigger><SelectValue /></SelectTrigger>
+                                      <SelectContent>
+                                        <SelectItem value="EURC">EURC (Euro Coin)</SelectItem>
+                                        <SelectItem value="EURA">EURA (Angle EUR)</SelectItem>
+                                        <SelectItem value="USDC">USDC (USD Coin)</SelectItem>
+                                        <SelectItem value="USDT">USDT (Tether)</SelectItem>
+                                        <SelectItem value="DAI">DAI</SelectItem>
+                                        <SelectItem value="ETH">ETH</SelectItem>
+                                        <SelectItem value="BTC">BTC</SelectItem>
+                                        <SelectItem value="OTHER">Autre...</SelectItem>
+                                      </SelectContent>
+                                    </Select>
+                                  </div>
+                                  <div>
+                                    <Label className="text-xs text-muted-foreground">Montant crypto {newTransaction.type === "crypto_buy" ? "reçu" : "vendu"}</Label>
+                                    <Input 
+                                      type="number" 
+                                      step="0.000001"
+                                      value={newTransaction.crypto_amount} 
+                                      onChange={(e) => setNewTransaction({...newTransaction, crypto_amount: parseFloat(e.target.value) || 0})} 
+                                      placeholder="Ex: 100.00"
+                                      data-testid="crypto-amount-input"
+                                    />
+                                  </div>
+                                </div>
+                                
+                                {/* Quick copy from fiat amount */}
+                                {newTransaction.amount > 0 && newTransaction.crypto_amount === 0 && (
+                                  <Button 
+                                    type="button" 
+                                    variant="outline" 
+                                    size="sm" 
+                                    className="text-xs"
+                                    onClick={() => setNewTransaction({...newTransaction, crypto_amount: newTransaction.amount})}
+                                  >
+                                    Copier le montant fiat (1:1)
+                                  </Button>
+                                )}
+                                
+                                {/* Summary */}
+                                {newTransaction.crypto_amount > 0 && newTransaction.amount > 0 && (
+                                  <div className="text-xs text-muted-foreground bg-zinc-800/50 p-2 rounded">
+                                    {newTransaction.type === "crypto_buy" ? (
+                                      <span>Achat: <strong className="text-red-400">{newTransaction.amount} {selectedAccount.currency}</strong> → <strong className="text-green-400">{newTransaction.crypto_amount} {newTransaction.crypto_asset}</strong></span>
+                                    ) : (
+                                      <span>Vente: <strong className="text-red-400">{newTransaction.crypto_amount} {newTransaction.crypto_asset}</strong> → <strong className="text-green-400">{newTransaction.amount} {selectedAccount.currency}</strong></span>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
                             {/* Source - affiché pour dépôts, ventes crypto, virements entrants */}
                             {needsSourceInput && (
                               <div className="p-3 bg-zinc-800/50 rounded-lg space-y-3">
