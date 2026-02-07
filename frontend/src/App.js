@@ -3121,7 +3121,19 @@ const PositionsPage = () => {
       <Dialog open={movementsDialogOpen} onOpenChange={setMovementsDialogOpen}>
         <DialogContent className="max-w-2xl">
           <DialogHeader>
-            <DialogTitle>Historique des Mouvements</DialogTitle>
+            <DialogTitle className="flex justify-between items-center">
+              <span>Historique des Mouvements</span>
+              {selectedPositionMovements.length > 0 && (
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => handleExportMovementsCSV(selectedPositionForMovement?.id)}
+                >
+                  <Download size={14} className="mr-2" />
+                  Export CSV
+                </Button>
+              )}
+            </DialogTitle>
             {selectedPositionForMovement && (
               <p className="text-sm text-muted-foreground">
                 {selectedPositionForMovement.platform} - {selectedPositionForMovement.product_type} - {selectedPositionForMovement.asset}
@@ -3143,17 +3155,23 @@ const PositionsPage = () => {
                 </TableHeader>
                 <TableBody>
                   {selectedPositionMovements.map((mov) => (
-                    <TableRow key={mov.id}>
-                      <TableCell className="text-sm">{new Date(mov.date).toLocaleDateString("fr-FR")}</TableCell>
+                    <TableRow key={mov.id} className="text-zinc-100">
+                      <TableCell className="text-sm text-zinc-100">{new Date(mov.date).toLocaleDateString("fr-FR")}</TableCell>
                       <TableCell>
                         <span className={getMovementTypeColor(mov.movement_type)}>
                           {getMovementTypeLabel(mov.movement_type)}
                         </span>
                       </TableCell>
-                      <TableCell className={`text-right font-mono ${mov.movement_type === "impermanent_loss" ? "text-red-400" : "text-green-400"}`}>
-                        {mov.movement_type === "impermanent_loss" ? "-" : "+"}{mov.amount?.toFixed(2)}
+                      <TableCell className={`text-right font-mono ${
+                        mov.movement_type === "impermanent_loss" ? "text-red-400" : 
+                        mov.movement_type === "capital_withdrawal" ? "text-amber-400" :
+                        mov.movement_type === "capital_addition" ? "text-blue-400" :
+                        "text-green-400"
+                      }`}>
+                        {mov.movement_type === "impermanent_loss" ? "-" : 
+                         mov.movement_type === "capital_withdrawal" ? "-" : "+"}{mov.amount?.toFixed(2)}
                       </TableCell>
-                      <TableCell className="font-mono">{mov.asset}</TableCell>
+                      <TableCell className="font-mono text-zinc-100">{mov.asset}</TableCell>
                       <TableCell className="text-sm text-muted-foreground max-w-[150px] truncate">{mov.notes || "-"}</TableCell>
                       <TableCell>
                         <Button 
