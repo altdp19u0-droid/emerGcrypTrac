@@ -1268,14 +1268,14 @@ const TransactionsPage = () => {
         : newTransaction.date;
       
       const { time, ...transactionData } = newTransaction;
-      await api.post("/transactions", {
+      const response = await api.post("/transactions", {
         ...transactionData,
         date: dateTime,
         wallet_name: wallet?.name || "Unknown",
         value_usd: newTransaction.amount * newTransaction.price_usd,
         value_eur: newTransaction.amount * newTransaction.price_eur
       });
-      toast.success("Transaction créée");
+      toast.success(response.data.message || "Transaction créée");
       setDialogOpen(false);
       // Reset form with current date/time
       setNewTransaction({
@@ -1284,7 +1284,9 @@ const TransactionsPage = () => {
         source: "manual", 
         date: new Date().toISOString().split("T")[0], 
         time: new Date().toTimeString().slice(0, 5),
-        counterparty_wallet: ""
+        counterparty_wallet: "",
+        target_wallet_id: "",
+        create_counterpart_tx: false
       });
       fetchTransactions();
     } catch (error) {
