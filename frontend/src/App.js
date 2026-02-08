@@ -1163,6 +1163,54 @@ const TransactionsPage = () => {
 
   const api = createAuthenticatedApi(accessToken);
 
+  // Helper function to get blockchain explorer URL for an address
+  const getExplorerAddressUrl = (address, walletName) => {
+    if (!address) return null;
+    
+    // Determine network from wallet name or default to Ethereum
+    const nameLower = (walletName || "").toLowerCase();
+    
+    if (nameLower.includes("base")) {
+      return `https://basescan.org/address/${address}`;
+    } else if (nameLower.includes("polygon") || nameLower.includes("matic")) {
+      return `https://polygonscan.com/address/${address}`;
+    } else if (nameLower.includes("bsc") || nameLower.includes("binance")) {
+      return `https://bscscan.com/address/${address}`;
+    } else if (nameLower.includes("arbitrum")) {
+      return `https://arbiscan.io/address/${address}`;
+    } else if (nameLower.includes("optimism")) {
+      return `https://optimistic.etherscan.io/address/${address}`;
+    } else if (nameLower.includes("gnosis") || nameLower.includes("xdai")) {
+      return `https://gnosisscan.io/address/${address}`;
+    } else {
+      // Default to Ethereum
+      return `https://etherscan.io/address/${address}`;
+    }
+  };
+
+  // Helper function to get blockchain explorer URL for a transaction hash
+  const getExplorerTxUrl = (txHash, walletName) => {
+    if (!txHash) return null;
+    
+    const nameLower = (walletName || "").toLowerCase();
+    
+    if (nameLower.includes("base")) {
+      return `https://basescan.org/tx/${txHash}`;
+    } else if (nameLower.includes("polygon") || nameLower.includes("matic")) {
+      return `https://polygonscan.com/tx/${txHash}`;
+    } else if (nameLower.includes("bsc") || nameLower.includes("binance")) {
+      return `https://bscscan.com/tx/${txHash}`;
+    } else if (nameLower.includes("arbitrum")) {
+      return `https://arbiscan.io/tx/${txHash}`;
+    } else if (nameLower.includes("optimism")) {
+      return `https://optimistic.etherscan.io/tx/${txHash}`;
+    } else if (nameLower.includes("gnosis") || nameLower.includes("xdai")) {
+      return `https://gnosisscan.io/tx/${txHash}`;
+    } else {
+      return `https://etherscan.io/tx/${txHash}`;
+    }
+  };
+
   const fetchTransactions = useCallback(async () => {
     try {
       const params = {
