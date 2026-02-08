@@ -111,6 +111,48 @@ CHAIN_SCANNERS = {
 # CoinGecko API
 COINGECKO_API_URL = "https://api.coingecko.com/api/v3"
 
+# ==================== SPAM DETECTION PATTERNS ====================
+# These patterns are used to automatically detect spam/phishing tokens
+DEFAULT_SPAM_PATTERNS = [
+    # Telegram/social links
+    "t.me", "telegram", "@", 
+    # Phishing keywords
+    "claim", "visit", "airdrop", "reward", "free", "bonus",
+    # Suspicious URLs
+    ".eu", ".live", ".xyz", ".win", ".io/", "http", "www.",
+    # Fake stablecoin variants (cyrillic characters, etc.)
+    "ꓴꓢꓓ", "UЅDС", "UЅDT",  # Cyrillic lookalikes
+    # Known spam token names
+    "PAWS", "USDWIN", "solshiba",
+    # Special characters often used in spam
+    "⭐", "🎁", "💰", "🔥", "*claim", "*visit",
+    # Bot references
+    "_bot", "Bot_",
+]
+
+def is_spam_token(token_symbol: str, custom_patterns: list = None) -> bool:
+    """Check if a token symbol matches spam patterns"""
+    if not token_symbol:
+        return False
+    
+    patterns = custom_patterns or DEFAULT_SPAM_PATTERNS
+    token_lower = token_symbol.lower()
+    
+    for pattern in patterns:
+        if pattern.lower() in token_lower:
+            return True
+    
+    # Additional heuristics
+    # Very long token names are often spam
+    if len(token_symbol) > 50:
+        return True
+    
+    # Tokens starting with $ followed by text (fake USD tokens)
+    if token_symbol.startswith("$") and len(token_symbol) > 5:
+        return True
+    
+    return False
+
 # Stablecoin mapping
 STABLECOIN_IDS = {
     "USDC": "usd-coin",
