@@ -4106,10 +4106,9 @@ async def get_portfolio_summary(current_user: dict = Depends(get_current_user)):
         if asset not in holdings:
             holdings[asset] = 0
         
-        if tx.get("type") in ["Transfer In", "Buy"]:
-            holdings[asset] += amount
-        elif tx.get("type") in ["Transfer Out", "Sell"]:
-            holdings[asset] -= amount
+        # Amount is already signed (positive for IN, negative for OUT)
+        # Just add directly
+        holdings[asset] += amount
     
     prices = await get_crypto_prices()
     
