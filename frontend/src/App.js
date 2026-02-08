@@ -5924,11 +5924,14 @@ const DeFiPage = () => {
                         <div key={asset} className="flex items-center justify-between p-2 bg-zinc-900 rounded">
                           <div className="flex items-center gap-2">
                             <Badge variant="secondary">{asset}</Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {data.net_position?.toLocaleString('fr-FR', {minimumFractionDigits: 2})} tokens
+                            </span>
                           </div>
                           <div className="text-right text-sm">
-                            <span className="text-green-400">+{data.rewards?.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</span>
+                            <span className="text-green-400">+€{(data.rewards_eur || 0)?.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</span>
                             <span className="text-muted-foreground mx-1">|</span>
-                            <span className="text-blue-400">Net: {data.net_position?.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</span>
+                            <span className="text-blue-400">Net: €{((data.deposits_eur || 0) + (data.rewards_eur || 0) - (data.withdrawals_eur || 0))?.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</span>
                           </div>
                         </div>
                       ))}
