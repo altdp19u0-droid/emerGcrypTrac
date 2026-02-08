@@ -359,28 +359,52 @@ def categorize_transaction_by_address(tx: dict) -> dict:
     Auto-categorize transaction based on known DeFi protocol addresses.
     Returns dict with suggested category, income_type, and protocol name.
     """
-    from_addr = normalize_address(tx.get("from_address", "") or tx.get("source_address", ""))
-    to_addr = normalize_address(tx.get("to_address", "") or tx.get("destination_address", ""))
+    # Get counterparty address (can be in different fields)
+    counterparty = normalize_address(
+        tx.get("counterparty_wallet", "") or 
+        tx.get("from_address", "") or 
+        tx.get("to_address", "") or 
+        tx.get("source_address", "") or 
+        tx.get("destination_address", "")
+    )
+    
+    tx_type = tx.get("type", "")
     asset = tx.get("asset", "").upper()
+    
+    # Determine if incoming or outgoing
+    is_incoming = tx_type in ["Transfer In", "Buy"]
+    is_outgoing = tx_type in ["Transfer Out", "Sell"]
     
     for protocol_key, protocol in DEFI_PROTOCOL_ADDRESSES.items():
         for rule in protocol.get("categorization_rules", []):
             rule_from, rule_to, rule_asset, category, income_type = rule
             
-            # Check if rule matches
-            from_match = rule_from is None or normalize_address(rule_from) == from_addr
-            to_match = rule_to is None or normalize_address(rule_to) == to_addr
+            # Check asset match
             asset_match = rule_asset is None or rule_asset.upper() == asset
+            if not asset_match:
+                continue
             
-            # At least one address must match
-            if (rule_from or rule_to) and from_match and to_match and asset_match:
-                return {
-                    "protocol": protocol_key,
-                    "protocol_name": protocol["name"],
-                    "category": category,
-                    "income_type": income_type,
-                    "matched_rule": rule
-                }
+            # For incoming transactions, check if counterparty is the "from" address
+            if is_incoming and rule_from:
+                if normalize_address(rule_from) == counterparty:
+                    return {
+                        "protocol": protocol_key,
+                        "protocol_name": protocol["name"],
+                        "category": category,
+                        "income_type": income_type,
+                        "matched_rule": rule
+                    }
+            
+            # For outgoing transactions, check if counterparty is the "to" address
+            if is_outgoing and rule_to:
+                if normalize_address(rule_to) == counterparty:
+                    return {
+                        "protocol": protocol_key,
+                        "protocol_name": protocol["name"],
+                        "category": category,
+                        "income_type": income_type,
+                        "matched_rule": rule
+                    }
     
     return None
 
