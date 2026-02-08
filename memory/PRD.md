@@ -49,15 +49,16 @@ Application de suivi de portefeuille crypto/fiat pour le calcul des impôts. Foc
 ## Changelog
 
 ### 2025-02-08 (Session actuelle)
-- ✅ **Amélioration affichage DeFi - Assets 100% rewards**
-  - Problème: Pour 8LNDS (sans dépôt), l'affichage `+€18,446 | Net: €18,446` était redondant
-  - Solution: Nouvel affichage `Valeur: €18,446 (100% rewards)` pour les assets sans dépôts
-  - Les assets avec dépôts (USDC) conservent l'affichage `+€X | Net: €Y`
+- ✅ **Dashboard - Affichage double devise**
+  - Total Portfolio Value affiché en USD ($579.08) ET EUR (€534,35)
 
-- ✅ **Bug fix vérifié: Affichage valeur EUR DeFi**
-  - Le bug signalé: la valeur "Net" pour 8LNDS affichait la quantité de tokens (2005.009) au lieu de la valeur EUR (€18.45)
-  - Vérification: Le bug a été corrigé, l'affichage est maintenant correct
-  - Test réussi: 100% backend, 100% frontend
+- ✅ **Rapports - Section Positions DeFi ajoutée**
+  - Cartes résumé : Capital Investi, Rewards Accumulés, Retraits, ROI
+  - Tableau détaillé par protocole (8LENDS Lending)
+  - Mention fiscale : "Non imposable tant que non vendu"
+
+- ✅ **Amélioration affichage DeFi - Assets 100% rewards**
+  - Nouvel affichage `Valeur: €18,446 (100% rewards)` pour les assets sans dépôts
 
 ### 2025-02-08 (Sessions précédentes)
 - ✅ **Page DeFi - Suivi automatisé des positions**
