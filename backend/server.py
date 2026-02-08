@@ -1974,6 +1974,199 @@ async def remove_hidden_token(symbol: str, current_user: dict = Depends(get_curr
         raise HTTPException(status_code=404, detail="Token not found in hidden list")
     return {"message": f"Token {symbol.upper()} removed from hidden list"}
 
+# ==================== SPAM TOKEN MANAGEMENT ====================
+
+@api_router.get("/spam-tokens/patterns")
+async def get_spam_patterns(current_user: dict = Depends(get_current_user)):
+    """Get current spam detection patterns"""
+    user_id = current_user["id"]
+    
+    # Get user custom patterns
+    user_patterns = await db.spam_patterns.find_one({"user_id": user_id}, {"_id": 0})
+    custom_patterns = user_patterns.get("patterns", []) if user_patterns else []
+    
+    return {
+        "default_patterns": DEFAULT_SPAM_PATTERNS,
+        "custom_patterns": custom_patterns,
+        "all_patterns": DEFAULT_SPAM_PATTERNS + custom_patterns
+    }
+
+@api_router.post("/spam-tokens/patterns")
+async def add_spam_pattern(request: dict, current_user: dict = Depends(get_current_user)):
+    """Add a custom spam pattern"""
+    user_id = current_user["id"]
+    pattern = request.get("pattern", "").strip()
+    
+    if not pattern:
+        raise HTTPException(status_code=400, detail="Pattern is required")
+    
+    # Update or create user patterns
+    await db.spam_patterns.update_one(
+        {"user_id": user_id},
+        {"$addToSet": {"patterns": pattern}},
+        upsert=True
+    )
+    
+    return {"message": f"Pattern '{pattern}' added", "pattern": pattern}
+
+@api_router.delete("/spam-tokens/patterns/{pattern}")
+async def remove_spam_pattern(pattern: str, current_user: dict = Depends(get_current_user)):
+    """Remove a custom spam pattern"""
+    user_id = current_user["id"]
+    
+    await db.spam_patterns.update_one(
+        {"user_id": user_id},
+        {"$pull": {"patterns": pattern}}
+    )
+    
+    return {"message": f"Pattern '{pattern}' removed"}
+
+@api_router.get("/spam-tokens")
+async def get_spam_tokens(current_user: dict = Depends(get_current_user)):
+    """Get all tokens currently marked as spam with their transaction counts"""
+    user_id = current_user["id"]
+    
+    # Aggregate spam transactions by asset
+    pipeline = [
+        {"$match": {"user_id": user_id, "is_spam": True}},
+        {"$group": {
+            "_id": "$asset",
+            "count": {"$sum": 1},
+            "total_amount": {"$sum": "$amount"},
+            "sample_tx": {"$first": "$tx_hash"}
+        }},
+        {"$sort": {"count": -1}}
+    ]
+    
+    spam_tokens = await db.transactions.aggregate(pipeline).to_list(1000)
+    
+    return {
+        "spam_tokens": [
+            {
+                "symbol": t["_id"],
+                "transaction_count": t["count"],
+                "total_amount": t["total_amount"],
+                "sample_tx": t.get("sample_tx")
+            }
+            for t in spam_tokens
+        ],
+        "total_spam_count": sum(t["count"] for t in spam_tokens)
+    }
+
+@api_router.post("/spam-tokens/scan")
+async def scan_and_mark_spam(current_user: dict = Depends(get_current_user)):
+    """Scan all transactions and mark spam tokens automatically"""
+    user_id = current_user["id"]
+    
+    # Get user custom patterns
+    user_patterns = await db.spam_patterns.find_one({"user_id": user_id}, {"_id": 0})
+    custom_patterns = user_patterns.get("patterns", []) if user_patterns else []
+    all_patterns = DEFAULT_SPAM_PATTERNS + custom_patterns
+    
+    # Find all transactions not yet marked as spam
+    transactions = await db.transactions.find({
+        "user_id": user_id,
+        "$or": [{"is_spam": False}, {"is_spam": {"$exists": False}}]
+    }).to_list(10000)
+    
+    marked_count = 0
+    marked_tokens = set()
+    
+    for tx in transactions:
+        asset = tx.get("asset", "")
+        if is_spam_token(asset, all_patterns):
+            await db.transactions.update_one(
+                {"_id": tx["_id"]},
+                {"$set": {"is_spam": True}}
+            )
+            marked_count += 1
+            marked_tokens.add(asset)
+    
+    return {
+        "message": f"{marked_count} transactions marquées comme spam",
+        "marked_count": marked_count,
+        "unique_tokens_marked": list(marked_tokens)
+    }
+
+@api_router.post("/spam-tokens/mark/{symbol}")
+async def mark_token_as_spam(symbol: str, current_user: dict = Depends(get_current_user)):
+    """Manually mark all transactions of a specific token as spam"""
+    user_id = current_user["id"]
+    
+    result = await db.transactions.update_many(
+        {"user_id": user_id, "asset": symbol},
+        {"$set": {"is_spam": True}}
+    )
+    
+    return {
+        "message": f"Token {symbol} marqué comme spam",
+        "updated_count": result.modified_count
+    }
+
+@api_router.post("/spam-tokens/unmark/{symbol}")
+async def unmark_token_as_spam(symbol: str, current_user: dict = Depends(get_current_user)):
+    """Remove spam flag from all transactions of a specific token"""
+    user_id = current_user["id"]
+    
+    result = await db.transactions.update_many(
+        {"user_id": user_id, "asset": symbol},
+        {"$set": {"is_spam": False}}
+    )
+    
+    return {
+        "message": f"Token {symbol} retiré du spam",
+        "updated_count": result.modified_count
+    }
+
+@api_router.get("/spam-tokens/preview")
+async def preview_spam_detection(current_user: dict = Depends(get_current_user)):
+    """Preview which tokens would be detected as spam without marking them"""
+    user_id = current_user["id"]
+    
+    # Get user custom patterns
+    user_patterns = await db.spam_patterns.find_one({"user_id": user_id}, {"_id": 0})
+    custom_patterns = user_patterns.get("patterns", []) if user_patterns else []
+    all_patterns = DEFAULT_SPAM_PATTERNS + custom_patterns
+    
+    # Get all unique tokens
+    pipeline = [
+        {"$match": {"user_id": user_id}},
+        {"$group": {
+            "_id": "$asset",
+            "count": {"$sum": 1},
+            "is_currently_spam": {"$first": "$is_spam"}
+        }}
+    ]
+    
+    tokens = await db.transactions.aggregate(pipeline).to_list(1000)
+    
+    would_be_spam = []
+    safe_tokens = []
+    
+    for t in tokens:
+        token_info = {
+            "symbol": t["_id"],
+            "transaction_count": t["count"],
+            "currently_marked_spam": t.get("is_currently_spam", False)
+        }
+        
+        if is_spam_token(t["_id"], all_patterns):
+            # Find which pattern matched
+            for pattern in all_patterns:
+                if pattern.lower() in t["_id"].lower():
+                    token_info["matched_pattern"] = pattern
+                    break
+            would_be_spam.append(token_info)
+        else:
+            safe_tokens.append(token_info)
+    
+    return {
+        "would_be_marked_spam": would_be_spam,
+        "safe_tokens": safe_tokens,
+        "spam_count": len(would_be_spam),
+        "safe_count": len(safe_tokens)
+    }
+
 # ==================== TRANSACTION CRUD ====================
 
 @api_router.post("/transactions", response_model=dict)
