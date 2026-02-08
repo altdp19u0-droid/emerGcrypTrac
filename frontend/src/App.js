@@ -1105,16 +1105,28 @@ const WalletsPage = () => {
                 {/* Action buttons in header */}
                 <div className="flex gap-2 ml-auto">
                   {wallet.type !== "manual" && (
-                    <Button 
-                      variant="ghost" 
-                      size="icon"
-                      onClick={() => syncFromBlockchain(wallet.id)}
-                      disabled={syncing === wallet.id}
-                      className="text-blue-400 hover:text-blue-500 hover:bg-blue-500/10"
-                      title="Synchroniser"
-                    >
-                      <RefreshCw size={18} className={syncing === wallet.id ? "animate-spin" : ""} />
-                    </Button>
+                    <>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => handleVerifyTransactions(wallet)}
+                        className="text-amber-400 hover:text-amber-500 hover:bg-amber-500/10"
+                        title="Vérifier les transactions manquantes"
+                        data-testid={`verify-wallet-${wallet.id}`}
+                      >
+                        <Eye size={18} />
+                      </Button>
+                      <Button 
+                        variant="ghost" 
+                        size="icon"
+                        onClick={() => syncFromBlockchain(wallet.id)}
+                        disabled={syncing === wallet.id}
+                        className="text-blue-400 hover:text-blue-500 hover:bg-blue-500/10"
+                        title="Synchroniser"
+                      >
+                        <RefreshCw size={18} className={syncing === wallet.id ? "animate-spin" : ""} />
+                      </Button>
+                    </>
                   )}
                   <Button 
                     variant="ghost" 
