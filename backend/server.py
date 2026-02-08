@@ -1267,11 +1267,60 @@ async def sync_address_on_chain(request: SyncChainRequest, current_user: dict = 
                                 date=tx_date.strftime("%Y-%m-%d"),
                                 tx_hash=tx_hash,
                                 counterparty_wallet=from_addr.get("hash", "") if is_incoming else to_addr.get("hash", ""),
-                                notes="Frais gas non disponibles via API token-transfers"
+                                notes=""
                             )
                             
                             await db.transactions.insert_one(transaction.model_dump())
                             imported_count += 1
+                            
+                            # Double-entry: Check if counterparty is also user's wallet
+                            counterparty_address = from_addr.get("hash", "") if is_incoming else to_addr.get("hash", "")
+                            if counterparty_address:
+                                counterparty_wallet = await db.wallets.find_one({
+                                    "user_id": user_id,
+                                    "address": {"$regex": f"^{counterparty_address}$", "$options": "i"}
+                                }, {"_id": 0})
+                                
+                                if counterparty_wallet:
+                                    # Check if mirror transaction already exists
+                                    mirror_type = "Transfer Out" if is_incoming else "Transfer In"
+                                    mirror_existing = await db.transactions.find_one({
+                                        "tx_hash": tx_hash,
+                                        "user_id": user_id,
+                                        "asset": symbol,
+                                        "wallet_id": counterparty_wallet["id"]
+                                    })
+                                    
+                                    if not mirror_existing:
+                                        # Create mirror transaction in counterparty wallet
+                                        mirror_tx = Transaction(
+                                            user_id=user_id,
+                                            type=mirror_type,
+                                            asset=symbol,
+                                            amount=-amount if is_incoming else amount,  # Opposite sign
+                                            price_usd=price_usd,
+                                            price_eur=price_eur,
+                                            value_usd=amount * price_usd,
+                                            value_eur=amount * price_eur,
+                                            fees=0,
+                                            wallet_id=counterparty_wallet["id"],
+                                            wallet_name=counterparty_wallet["name"],
+                                            source=f"blockchain_{network.lower()}",
+                                            date=tx_date.strftime("%Y-%m-%d"),
+                                            tx_hash=tx_hash,
+                                            counterparty_wallet=address,  # Original wallet is the counterparty
+                                            linked_tx_id=transaction.id,  # Link to original
+                                            notes="Double-entry automatique"
+                                        )
+                                        
+                                        await db.transactions.insert_one(mirror_tx.model_dump())
+                                        
+                                        # Update original transaction with link
+                                        await db.transactions.update_one(
+                                            {"id": transaction.id},
+                                            {"$set": {"linked_tx_id": mirror_tx.id}}
+                                        )
+                                        imported_count += 1
                     
                     # Check for next page
                     next_page_params = data.get("next_page_params")
