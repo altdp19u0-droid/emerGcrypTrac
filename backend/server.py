@@ -1818,6 +1818,58 @@ async def remove_address_classification(address: str, current_user: dict = Depen
         raise HTTPException(status_code=404, detail="Classification not found")
     return {"message": "Classification removed"}
 
+@api_router.post("/addresses/mark-wallets-trusted")
+async def mark_wallet_addresses_trusted(current_user: dict = Depends(get_current_user)):
+    """Automatically mark all user's wallet addresses as trusted (green)"""
+    user_id = current_user["id"]
+    
+    # Get all user's wallets
+    wallets = await db.wallets.find({"user_id": user_id}, {"_id": 0}).to_list(100)
+    
+    if not wallets:
+        return {"message": "Aucun wallet trouvé", "marked_count": 0}
+    
+    marked_count = 0
+    already_marked = 0
+    
+    for wallet in wallets:
+        address = wallet.get("address", "").lower()
+        if not address:
+            continue
+        
+        # Check if already classified
+        existing = await db.address_classifications.find_one({
+            "user_id": user_id,
+            "address": address
+        })
+        
+        if existing:
+            if existing.get("classification") == "trusted":
+                already_marked += 1
+                continue
+            # Update to trusted
+            await db.address_classifications.update_one(
+                {"user_id": user_id, "address": address},
+                {"$set": {"classification": "trusted", "wallet_name": wallet.get("name", "")}}
+            )
+        else:
+            # Create new classification
+            classification = AddressClassification(
+                user_id=user_id,
+                address=address,
+                classification="trusted",
+                wallet_name=wallet.get("name", "")
+            )
+            await db.address_classifications.insert_one(classification.model_dump())
+        
+        marked_count += 1
+    
+    return {
+        "message": f"{marked_count} adresses marquées comme fiables, {already_marked} déjà marquées",
+        "marked_count": marked_count,
+        "already_marked": already_marked
+    }
+
 # ==================== HIDDEN TOKENS ENDPOINTS ====================
 
 @api_router.post("/hidden-tokens")
