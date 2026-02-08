@@ -48,7 +48,20 @@ Application de suivi de portefeuille crypto/fiat pour le calcul des impôts. Foc
 
 ## Changelog
 
-### 2025-02-08
+### 2025-02-08 (Session actuelle)
+- ✅ **Bug fix vérifié: Affichage valeur EUR DeFi**
+  - Le bug signalé: la valeur "Net" pour 8LNDS affichait la quantité de tokens (2005.009) au lieu de la valeur EUR (€18.45)
+  - Vérification: Le bug a été corrigé, l'affichage est maintenant correct
+  - Test réussi: 100% backend, 100% frontend
+
+### 2025-02-08 (Sessions précédentes)
+- ✅ **Page DeFi - Suivi automatisé des positions**
+  - Nouvelle page "/defi" pour suivre les investissements DeFi
+  - Auto-catégorisation des transactions par protocole
+  - Calcul automatique ROI, dépôts, rewards, retraits
+  - Support initial: 8LENDS Lending
+  - Endpoints: `/api/defi/positions`, `/api/defi/auto-categorize`, `/api/defi/position/{protocol}`
+
 - ✅ Terminé: Fonctionnalité "Vérification des Transactions Manquantes"
   - Bouton "Vérifier" (icône œil) sur chaque wallet blockchain
   - Dialog avec liste des transactions manquantes + checkboxes
