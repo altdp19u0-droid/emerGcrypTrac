@@ -2201,7 +2201,7 @@ const TransactionsPage = () => {
                             <Input
                               type="number"
                               step="0.0001"
-                              placeholder="Prix en EUR (ex: 0.92)"
+                              placeholder="Prix EUR au moment des tx"
                               className="flex-1 h-8"
                               value={selectedTokenPrice.symbol === token.symbol ? selectedTokenPrice.price_eur : ""}
                               onChange={(e) => setSelectedTokenPrice({ symbol: token.symbol, price_eur: e.target.value })}
@@ -2217,6 +2217,9 @@ const TransactionsPage = () => {
                               Appliquer
                             </Button>
                           </div>
+                          <p className="text-xs text-muted-foreground mt-2 italic">
+                            💡 Le prix sera appliqué aux {token.transactions_count} transactions de la période indiquée
+                          </p>
                         </div>
                       ))}
                     </div>
