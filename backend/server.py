@@ -833,9 +833,256 @@ async def sync_wallet_from_etherscan(
     native_symbol = chain_info.get("native_symbol", "ETH")
     
     imported_count = 0
+    api_type = chain_info.get("api_type", "etherscan")
     
     try:
         async with httpx.AsyncClient() as client:
+            # Check if this network uses Blockscout API
+            if api_type == "blockscout":
+                # Use Blockscout API for Base and Optimism (FREE, no API key needed)
+                blockscout_url = BLOCKSCOUT_APIS.get(network)
+                
+                if not blockscout_url:
+                    raise HTTPException(status_code=400, detail=f"Blockscout URL not configured for {network}")
+                
+                # Get transactions via Blockscout
+                next_page_params = None
+                page_count = 0
+                max_pages = 20
+                
+                while page_count < max_pages:
+                    url = f"{blockscout_url}/addresses/{address}/transactions"
+                    params = {}
+                    if next_page_params:
+                        params.update(next_page_params)
+                    
+                    response = await client.get(url, params=params, timeout=30.0)
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        items = data.get("items", [])
+                        
+                        if not items:
+                            break
+                        
+                        for tx in items:
+                            tx_hash = tx.get("hash", "")
+                            value = int(tx.get("value", "0"))
+                            value_eth = value / (10 ** 18)
+                            
+                            if not tx_hash or value_eth == 0:
+                                continue
+                            
+                            existing = await db.transactions.find_one({
+                                "tx_hash": tx_hash,
+                                "user_id": user_id,
+                                "asset": native_symbol,
+                                "source": f"blockchain_{network.lower()}"
+                            })
+                            
+                            if not existing:
+                                from_addr = tx.get("from", {}) or {}
+                                to_addr = tx.get("to", {}) or {}
+                                is_incoming = to_addr.get("hash", "").lower() == address.lower()
+                                
+                                try:
+                                    tx_date = datetime.fromisoformat(tx.get("timestamp", "").replace("Z", "+00:00"))
+                                except:
+                                    tx_date = datetime.now(timezone.utc)
+                                
+                                # Get price
+                                price_usd = 2500  # Default ETH price
+                                price_eur = price_usd / 1.08
+                                try:
+                                    prices = await get_cached_prices([native_symbol.upper()])
+                                    if native_symbol.upper() in prices:
+                                        price_usd = prices[native_symbol.upper()]["usd"]
+                                        price_eur = prices[native_symbol.upper()].get("eur", price_usd / 1.08)
+                                except:
+                                    pass
+                                
+                                # Gas fees
+                                gas_used = float(tx.get("gas_used", 0))
+                                gas_price = float(tx.get("gas_price", 0))
+                                fees_native = (gas_used * gas_price) / (10 ** 18) if gas_used and gas_price else 0
+                                fees_eur = fees_native * price_eur
+                                
+                                tx_type = "Transfer In" if is_incoming else "Transfer Out"
+                                
+                                transaction = Transaction(
+                                    user_id=user_id,
+                                    type=tx_type,
+                                    asset=native_symbol,
+                                    amount=value_eth if is_incoming else -value_eth,
+                                    price_usd=price_usd,
+                                    price_eur=price_eur,
+                                    value_usd=value_eth * price_usd,
+                                    value_eur=value_eth * price_eur,
+                                    fees=fees_eur,
+                                    fees_currency="EUR",
+                                    wallet_id=wallet_id,
+                                    wallet_name=wallet_name_full,
+                                    source=f"blockchain_{network.lower()}",
+                                    date=tx_date.strftime("%Y-%m-%d"),
+                                    tx_hash=tx_hash,
+                                    counterparty_wallet=from_addr.get("hash", "") if is_incoming else to_addr.get("hash", ""),
+                                    notes=""
+                                )
+                                
+                                await db.transactions.insert_one(transaction.model_dump())
+                                imported_count += 1
+                        
+                        next_page_params = data.get("next_page_params")
+                        if not next_page_params:
+                            break
+                        page_count += 1
+                    else:
+                        break
+                
+                # Get token transfers via Blockscout
+                next_page_params = None
+                page_count = 0
+                
+                while page_count < max_pages:
+                    url = f"{blockscout_url}/addresses/{address}/token-transfers"
+                    params = {"type": "ERC-20"}
+                    if next_page_params:
+                        params.update(next_page_params)
+                    
+                    response = await client.get(url, params=params, timeout=30.0)
+                    
+                    if response.status_code == 200:
+                        data = response.json()
+                        items = data.get("items", [])
+                        
+                        if not items:
+                            break
+                        
+                        for tx in items:
+                            tx_hash = tx.get("transaction_hash", "")
+                            token = tx.get("token", {}) or {}
+                            symbol = token.get("symbol", "UNKNOWN") or "UNKNOWN"
+                            decimals = int(token.get("decimals") or 18)
+                            
+                            if not tx_hash or not symbol:
+                                continue
+                            
+                            existing = await db.transactions.find_one({
+                                "tx_hash": tx_hash,
+                                "user_id": user_id,
+                                "asset": symbol,
+                                "source": f"blockchain_{network.lower()}"
+                            })
+                            
+                            if not existing:
+                                total = tx.get("total", {}) or {}
+                                value_raw = total.get("value", "0")
+                                amount = float(value_raw) / (10 ** decimals) if value_raw else 0
+                                
+                                from_addr = tx.get("from", {}) or {}
+                                to_addr = tx.get("to", {}) or {}
+                                is_incoming = to_addr.get("hash", "").lower() == address.lower()
+                                
+                                try:
+                                    tx_date = datetime.fromisoformat(tx.get("timestamp", "").replace("Z", "+00:00"))
+                                except:
+                                    tx_date = datetime.now(timezone.utc)
+                                
+                                # Get price
+                                price_usd = 1.0  # Default for stablecoins
+                                price_eur = price_usd / 1.08
+                                try:
+                                    prices = await get_cached_prices([symbol.upper()])
+                                    if symbol.upper() in prices:
+                                        price_usd = prices[symbol.upper()]["usd"]
+                                        price_eur = prices[symbol.upper()].get("eur", price_usd / 1.08)
+                                except:
+                                    pass
+                                
+                                tx_type = "Transfer In" if is_incoming else "Transfer Out"
+                                
+                                transaction = Transaction(
+                                    user_id=user_id,
+                                    type=tx_type,
+                                    asset=symbol,
+                                    amount=amount if is_incoming else -amount,
+                                    price_usd=price_usd,
+                                    price_eur=price_eur,
+                                    value_usd=amount * price_usd,
+                                    value_eur=amount * price_eur,
+                                    fees=0,
+                                    wallet_id=wallet_id,
+                                    wallet_name=wallet_name_full,
+                                    source=f"blockchain_{network.lower()}",
+                                    date=tx_date.strftime("%Y-%m-%d"),
+                                    tx_hash=tx_hash,
+                                    counterparty_wallet=from_addr.get("hash", "") if is_incoming else to_addr.get("hash", ""),
+                                    notes=""
+                                )
+                                
+                                await db.transactions.insert_one(transaction.model_dump())
+                                imported_count += 1
+                                
+                                # Double-entry: Check if counterparty is also user's wallet
+                                counterparty_address = from_addr.get("hash", "") if is_incoming else to_addr.get("hash", "")
+                                if counterparty_address:
+                                    counterparty_wallet_doc = await db.wallets.find_one({
+                                        "user_id": user_id,
+                                        "address": {"$regex": f"^{counterparty_address}$", "$options": "i"}
+                                    }, {"_id": 0})
+                                    
+                                    if counterparty_wallet_doc:
+                                        mirror_type = "Transfer Out" if is_incoming else "Transfer In"
+                                        mirror_existing = await db.transactions.find_one({
+                                            "tx_hash": tx_hash,
+                                            "user_id": user_id,
+                                            "asset": symbol,
+                                            "wallet_id": counterparty_wallet_doc["id"]
+                                        })
+                                        
+                                        if not mirror_existing:
+                                            mirror_tx = Transaction(
+                                                user_id=user_id,
+                                                type=mirror_type,
+                                                asset=symbol,
+                                                amount=-amount if is_incoming else amount,
+                                                price_usd=price_usd,
+                                                price_eur=price_eur,
+                                                value_usd=amount * price_usd,
+                                                value_eur=amount * price_eur,
+                                                fees=0,
+                                                wallet_id=counterparty_wallet_doc["id"],
+                                                wallet_name=counterparty_wallet_doc["name"],
+                                                source=f"blockchain_{network.lower()}",
+                                                date=tx_date.strftime("%Y-%m-%d"),
+                                                tx_hash=tx_hash,
+                                                counterparty_wallet=address,
+                                                linked_tx_id=transaction.id,
+                                                notes="Double-entry automatique"
+                                            )
+                                            
+                                            await db.transactions.insert_one(mirror_tx.model_dump())
+                                            await db.transactions.update_one(
+                                                {"id": transaction.id},
+                                                {"$set": {"linked_tx_id": mirror_tx.id}}
+                                            )
+                                            imported_count += 1
+                        
+                        next_page_params = data.get("next_page_params")
+                        if not next_page_params:
+                            break
+                        page_count += 1
+                    else:
+                        break
+                
+                return {
+                    "message": f"Synced {imported_count} new transactions from {scanner_name}",
+                    "imported_count": imported_count,
+                    "network": network,
+                    "scanner": "Blockscout"
+                }
+            
+            # For Etherscan networks (Ethereum, Polygon, etc.) - requires API key
             # 1. Get native token (ETH/MATIC/etc) transactions using V2 API
             response = await client.get(
                 ETHERSCAN_V2_API,
