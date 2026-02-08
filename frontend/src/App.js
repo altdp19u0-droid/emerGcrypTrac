@@ -494,6 +494,69 @@ const Dashboard = () => {
     }
   };
 
+  // Spam token management functions
+  const fetchSpamTokens = async () => {
+    try {
+      const response = await api.get("/spam-tokens");
+      setSpamTokens(response.data.spam_tokens || []);
+    } catch (error) {
+      console.error("Error fetching spam tokens:", error);
+    }
+  };
+
+  const fetchSpamPreview = async () => {
+    try {
+      const response = await api.get("/spam-tokens/preview");
+      setSpamPreview(response.data);
+    } catch (error) {
+      console.error("Error fetching spam preview:", error);
+    }
+  };
+
+  const handleScanSpam = async () => {
+    setScanningSpam(true);
+    try {
+      const response = await api.post("/spam-tokens/scan");
+      toast.success(response.data.message);
+      fetchSpamTokens();
+      fetchSpamPreview();
+      fetchData(); // Refresh portfolio
+    } catch (error) {
+      toast.error("Erreur lors du scan");
+    } finally {
+      setScanningSpam(false);
+    }
+  };
+
+  const handleMarkAsSpam = async (symbol) => {
+    try {
+      await api.post(`/spam-tokens/mark/${encodeURIComponent(symbol)}`);
+      toast.success(`${symbol} marqué comme spam`);
+      fetchSpamTokens();
+      fetchSpamPreview();
+      fetchData();
+    } catch (error) {
+      toast.error("Erreur lors du marquage");
+    }
+  };
+
+  const handleUnmarkSpam = async (symbol) => {
+    try {
+      await api.post(`/spam-tokens/unmark/${encodeURIComponent(symbol)}`);
+      toast.success(`${symbol} retiré du spam`);
+      fetchSpamTokens();
+      fetchSpamPreview();
+      fetchData();
+    } catch (error) {
+      toast.error("Erreur lors du retrait");
+    }
+  };
+
+  const openSpamDialog = async () => {
+    setSpamDialogOpen(true);
+    await Promise.all([fetchSpamTokens(), fetchSpamPreview()]);
+  };
+
   const COLORS = ["#3B82F6", "#EF4444", "#10B981", "#F59E0B", "#8B5CF6"];
 
   // Filter out spam tokens - only show assets with value > 0, percentage > 0.1%, and not in hidden list
