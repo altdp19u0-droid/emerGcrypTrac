@@ -421,6 +421,12 @@ const Dashboard = () => {
   const [hiddenTokens, setHiddenTokens] = useState([]);
   const [newHiddenToken, setNewHiddenToken] = useState("");
   const [hiddenTokensDialogOpen, setHiddenTokensDialogOpen] = useState(false);
+  
+  // Spam tokens management
+  const [spamDialogOpen, setSpamDialogOpen] = useState(false);
+  const [spamTokens, setSpamTokens] = useState([]);
+  const [spamPreview, setSpamPreview] = useState({ would_be_marked_spam: [], safe_tokens: [] });
+  const [scanningSpam, setScanningSpam] = useState(false);
 
   const api = createAuthenticatedApi(accessToken);
 
