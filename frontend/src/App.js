@@ -1310,39 +1310,83 @@ const TransactionsPage = () => {
     }
   };
 
-  // Export transactions to CSV
-  const handleExportTransactionsCSV = () => {
-    if (transactions.length === 0) {
-      toast.error("Aucune transaction à exporter");
-      return;
+  // Export transactions to CSV - ALL transactions matching current filters
+  const handleExportTransactionsCSV = async () => {
+    try {
+      toast.info("Récupération de toutes les transactions...");
+      
+      // Fetch ALL transactions with current filters (no pagination limit)
+      const params = {
+        page: 1,
+        page_size: 200, // Max allowed by backend
+        ...(filters.wallet_ids.length > 0 && { wallet_ids: filters.wallet_ids.join(",") }),
+        ...(filters.assets.length > 0 && { assets: filters.assets.join(",") }),
+        ...(filters.tx_types.length > 0 && { tx_types: filters.tx_types.join(",") }),
+        ...(filters.start_date && { start_date: filters.start_date }),
+        ...(filters.end_date && { end_date: filters.end_date }),
+        hide_spam: filters.hide_spam,
+        include_fiat: filters.include_fiat,
+        ...(filters.fiat_account_ids.length > 0 && { fiat_account_ids: filters.fiat_account_ids.join(",") })
+      };
+      
+      // Fetch all pages
+      let allTransactions = [];
+      let currentPage = 1;
+      let totalPages = 1;
+      
+      do {
+        const response = await api.get("/transactions", { params: { ...params, page: currentPage } });
+        allTransactions = [...allTransactions, ...response.data.transactions];
+        totalPages = response.data.total_pages || 1;
+        currentPage++;
+      } while (currentPage <= totalPages);
+      
+      if (allTransactions.length === 0) {
+        toast.error("Aucune transaction à exporter");
+        return;
+      }
+    
+      const headers = ["Date", "Type", "Libellé", "Asset", "Amount", "Price EUR", "Value EUR", "Fees", "Fees Currency", "Wallet", "Source", "Counterparty", "TX Hash", "Is Spam"];
+      const categoryLabels = {
+        "interest": "Intérêts",
+        "yield": "Rendement",
+        "airdrop": "Airdrop",
+        "reward": "Récompense",
+        "cashback": "Cashback",
+        "fee": "Frais",
+        "gas": "Gas",
+        "subscription": "Abonnement",
+        "payment": "Paiement"
+      };
+      const rows = allTransactions.map(tx => [
+        tx.date,
+        tx.type,
+        categoryLabels[tx.income_category] || "",
+        tx.asset,
+        tx.amount,
+        tx.price_eur,
+        tx.value_eur,
+        tx.fees || 0,
+        tx.fees_currency || "EUR",
+        tx.wallet_name,
+        tx.source,
+        tx.counterparty_wallet || "",
+        tx.tx_hash || "",
+        tx.is_spam ? "Yes" : "No"
+      ]);
+    
+      const csvContent = [headers.join(","), ...rows.map(r => r.map(v => `"${v}"`).join(","))].join("\n");
+      const blob = new Blob([csvContent], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `transactions_export_${new Date().toISOString().split("T")[0]}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Export CSV téléchargé (${allTransactions.length} transactions)`);
+    } catch (error) {
+      toast.error("Erreur lors de l'export");
     }
-    
-    const headers = ["Date", "Type", "Asset", "Amount", "Price EUR", "Value EUR", "Fees", "Fees Currency", "Wallet", "Source", "Counterparty", "TX Hash", "Is Spam"];
-    const rows = transactions.map(tx => [
-      tx.date,
-      tx.type,
-      tx.asset,
-      tx.amount,
-      tx.price_eur,
-      tx.value_eur,
-      tx.fees || 0,
-      tx.fees_currency || "EUR",
-      tx.wallet_name,
-      tx.source,
-      tx.counterparty_wallet || "",
-      tx.tx_hash || "",
-      tx.is_spam ? "Yes" : "No"
-    ]);
-    
-    const csvContent = [headers.join(","), ...rows.map(r => r.map(v => `"${v}"`).join(","))].join("\n");
-    const blob = new Blob([csvContent], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `transactions_export_${new Date().toISOString().split("T")[0]}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    toast.success("Export CSV téléchargé");
   };
 
   const toggleSpam = async (txId) => {
