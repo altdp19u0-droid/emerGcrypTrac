@@ -1156,7 +1156,14 @@ const WalletsPage = () => {
                                   {tx.tx_hash.slice(0, 16)}...{tx.tx_hash.slice(-8)}
                                 </span>
                                 <a 
-                                  href={`https://etherscan.io/tx/${tx.tx_hash}`} 
+                                  href={(() => {
+                                    const network = verifyingWallet?.network?.toLowerCase() || '';
+                                    if (network.includes('base')) return `https://basescan.org/tx/${tx.tx_hash}`;
+                                    if (network.includes('polygon')) return `https://polygonscan.com/tx/${tx.tx_hash}`;
+                                    if (network.includes('arbitrum')) return `https://arbiscan.io/tx/${tx.tx_hash}`;
+                                    if (network.includes('optimism')) return `https://optimistic.etherscan.io/tx/${tx.tx_hash}`;
+                                    return `https://etherscan.io/tx/${tx.tx_hash}`;
+                                  })()} 
                                   target="_blank" 
                                   rel="noopener noreferrer"
                                   onClick={(e) => e.stopPropagation()}
