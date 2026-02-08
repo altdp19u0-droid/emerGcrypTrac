@@ -111,6 +111,115 @@ CHAIN_SCANNERS = {
 # CoinGecko API
 COINGECKO_API_URL = "https://api.coingecko.com/api/v3"
 
+# DeFiLlama API for historical prices
+DEFILLAMA_PRICE_API = "https://coins.llama.fi"
+
+# Token contract addresses by chain (for DeFiLlama price lookups)
+# Format: "SYMBOL": {"chain": "contract_address"}
+TOKEN_CONTRACTS = {
+    "8LNDS": {
+        "base": "0x1e4b398c1e1c1f87738E9b327671b444f5764D3b",  # 8LENDS on Base
+    },
+    "USDC": {
+        "ethereum": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
+        "polygon": "0x2791bca1f2de4661ed88a30c99a7a9449aa84174",
+        "base": "0x833589fcd6edb6e08f4c7c32d4f71b54bda02913",
+        "arbitrum": "0xaf88d065e77c8cc2239327c5edb3a432268e5831",
+        "optimism": "0x7f5c764cbc14f9669b88837ca1490cca17c31607",
+    },
+    "EURC": {
+        "ethereum": "0x1abaea1f7c830bd89acc67ec4af516284b1bc33c",
+        "base": "0x60a3e35cc302bfa44cb288bc5a4f316fdb1adb42",
+    },
+    "agEUR": {
+        "ethereum": "0x1a7e4e63778b4f12a199c062f3efdd288afcbce8",
+        "polygon": "0xe0b52e49357fd4daf2c15e02058dce6bc0057db4",
+    },
+    "ZCHF": {
+        "ethereum": "0xb58e61c3098d85632df34eecfb899a1ed80921cb",
+    },
+    "stEUR": {
+        "ethereum": "0x004626a008b1acdc4c74ab51644093b155e59a23",
+    },
+    "stUSD": {
+        "ethereum": "0x0022228a2cc5e7ef0274a7baa600d44da5ab5776",
+    },
+    "sUSDS": {
+        "ethereum": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd",
+    },
+}
+
+# Chain name mapping for DeFiLlama
+CHAIN_TO_LLAMA = {
+    "Ethereum": "ethereum",
+    "Polygon": "polygon", 
+    "Base": "base",
+    "Arbitrum": "arbitrum",
+    "Optimism": "optimism",
+}
+
+async def get_historical_token_price(symbol: str, chain: str, timestamp: int) -> dict:
+    """
+    Fetch historical token price from DeFiLlama.
+    Returns {"price_usd": float, "price_eur": float} or empty dict if not found.
+    """
+    import aiohttp
+    from datetime import datetime
+    
+    symbol_upper = symbol.upper()
+    chain_lower = CHAIN_TO_LLAMA.get(chain, chain.lower())
+    
+    # Get contract address
+    token_info = TOKEN_CONTRACTS.get(symbol_upper, {})
+    contract = token_info.get(chain_lower)
+    
+    if not contract:
+        # Try to find contract on any chain
+        for chain_name, addr in token_info.items():
+            contract = addr
+            chain_lower = chain_name
+            break
+    
+    if not contract:
+        return {}
+    
+    # Build DeFiLlama coin ID
+    coin_id = f"{chain_lower}:{contract}"
+    
+    try:
+        async with aiohttp.ClientSession() as session:
+            # Try historical price first
+            url = f"{DEFILLAMA_PRICE_API}/prices/historical/{timestamp}/{coin_id}"
+            async with session.get(url, timeout=10) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    coins = data.get("coins", {})
+                    if coin_id in coins:
+                        price_usd = coins[coin_id].get("price", 0)
+                        return {
+                            "price_usd": price_usd,
+                            "price_eur": price_usd * 0.92,  # Approximate EUR conversion
+                            "source": "defillama_historical"
+                        }
+            
+            # Fallback to current price
+            url = f"{DEFILLAMA_PRICE_API}/prices/current/{coin_id}"
+            async with session.get(url, timeout=10) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    coins = data.get("coins", {})
+                    if coin_id in coins:
+                        price_usd = coins[coin_id].get("price", 0)
+                        return {
+                            "price_usd": price_usd,
+                            "price_eur": price_usd * 0.92,
+                            "source": "defillama_current"
+                        }
+    except Exception as e:
+        logger.error(f"Error fetching price from DeFiLlama: {e}")
+    
+    return {}
+
 # ==================== SPAM DETECTION PATTERNS ====================
 # These patterns are used to automatically detect spam/phishing tokens
 DEFAULT_SPAM_PATTERNS = [
