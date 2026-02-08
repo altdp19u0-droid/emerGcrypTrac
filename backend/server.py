@@ -1724,12 +1724,31 @@ async def sync_address_on_chain(request: SyncChainRequest, current_user: dict = 
 @api_router.post("/wallets", response_model=dict)
 async def create_wallet(wallet_data: WalletCreate, current_user: dict = Depends(get_current_user)):
     """Create a new wallet"""
+    user_id = current_user["id"]
     wallet = Wallet(
-        user_id=current_user["id"],
+        user_id=user_id,
         **wallet_data.model_dump()
     )
     doc = wallet.model_dump()
     await db.wallets.insert_one(doc)
+    
+    # Auto-mark wallet address as trusted
+    address = wallet.address.lower() if wallet.address else ""
+    if address:
+        existing_class = await db.address_classifications.find_one({
+            "user_id": user_id,
+            "address": address
+        })
+        
+        if not existing_class:
+            classification = AddressClassification(
+                user_id=user_id,
+                address=address,
+                classification="trusted",
+                label=wallet.name
+            )
+            await db.address_classifications.insert_one(classification.model_dump())
+    
     return {"id": wallet.id, "name": wallet.name, "message": "Wallet created"}
 
 @api_router.get("/wallets")
