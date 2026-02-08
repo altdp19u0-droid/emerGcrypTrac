@@ -5084,9 +5084,26 @@ async def get_portfolio_summary(current_user: dict = Depends(get_current_user)):
     
     for asset, amount in holdings.items():
         if amount > 0:
-            price_data = prices.get(asset, {"price_usd": 1, "price_eur": 0.92})
-            value_usd = amount * price_data.get("price_usd", 1)
-            value_eur = amount * price_data.get("price_eur", 0.92)
+            price_data = prices.get(asset)
+            
+            # If no live price, get last known price from transactions
+            if not price_data or price_data.get("price_eur", 0) == 0:
+                last_tx = await db.transactions.find_one(
+                    {"user_id": current_user["id"], "asset": asset, "price_eur": {"$gt": 0}},
+                    {"price_eur": 1, "price_usd": 1, "_id": 0},
+                    sort=[("date", -1)]
+                )
+                if last_tx:
+                    price_data = {
+                        "price_eur": last_tx.get("price_eur", 0),
+                        "price_usd": last_tx.get("price_usd", 0),
+                        "change_24h": 0
+                    }
+                else:
+                    price_data = {"price_usd": 0, "price_eur": 0, "change_24h": 0}
+            
+            value_usd = amount * price_data.get("price_usd", 0)
+            value_eur = amount * price_data.get("price_eur", 0)
             
             total_value_usd += value_usd
             total_value_eur += value_eur
