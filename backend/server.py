@@ -2499,7 +2499,7 @@ async def set_token_price_for_all(request: dict, current_user: dict = Depends(ge
     - Only update transactions without price: {"symbol": "TOKEN", "price_eur": 1.0, "only_missing": true}
     """
     user_id = current_user["id"]
-    symbol = request.get("symbol", "").upper()
+    symbol = request.get("symbol", "")  # Keep original case
     price_eur = request.get("price_eur")
     price_usd = request.get("price_usd")
     start_date = request.get("start_date")
@@ -2518,32 +2518,37 @@ async def set_token_price_for_all(request: dict, current_user: dict = Depends(ge
     elif price_usd is None and price_eur is not None:
         price_usd = price_eur / 0.92
     
-    # Build query
-    query = {
+    # Build query - try both original case and uppercase
+    base_query = {
         "user_id": user_id,
-        "asset": symbol,
+        "$or": [{"asset": symbol}, {"asset": symbol.upper()}]
     }
     
     # Date range filter
-    if start_date or end_date:
-        date_filter = {}
-        if start_date:
-            date_filter["$gte"] = start_date
-        if end_date:
-            date_filter["$lte"] = end_date + "T23:59:59"
-        query["date"] = date_filter
+    date_filter = {}
+    if start_date:
+        date_filter["$gte"] = start_date
+    if end_date:
+        date_filter["$lte"] = end_date + "T23:59:59"
+    
+    if date_filter:
+        base_query["date"] = date_filter
     
     # Only missing prices filter (default behavior)
     if only_missing:
-        query["$or"] = [
-            {"price_eur": {"$exists": False}},
-            {"price_eur": None},
-            {"price_eur": 0},
+        base_query["$and"] = [
+            {"$or": [{"asset": symbol}, {"asset": symbol.upper()}]},
+            {"$or": [
+                {"price_eur": {"$exists": False}},
+                {"price_eur": None},
+                {"price_eur": 0},
+            ]}
         ]
+        del base_query["$or"]
     
     # Update transactions
     result = await db.transactions.update_many(
-        query,
+        base_query,
         {"$set": {
             "price_eur": price_eur,
             "price_usd": price_usd,
