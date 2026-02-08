@@ -118,7 +118,7 @@ DEFILLAMA_PRICE_API = "https://coins.llama.fi"
 # Format: "SYMBOL": {"chain": "contract_address"}
 TOKEN_CONTRACTS = {
     "8LNDS": {
-        "base": "0x1e4b398c1e1c1f87738E9b327671b444f5764D3b",  # 8LENDS on Base
+        "base": "0x55F9C8992fc4AbCE5ACa585bf8F18284a2379D4C",  # 8LENDS on Base - verified
     },
     "USDC": {
         "ethereum": "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48",
@@ -134,15 +134,19 @@ TOKEN_CONTRACTS = {
     "agEUR": {
         "ethereum": "0x1a7e4e63778b4f12a199c062f3efdd288afcbce8",
         "polygon": "0xe0b52e49357fd4daf2c15e02058dce6bc0057db4",
+        "base": "0xa61beb4a3d02decb01039e378237032b351125b4",  # agEUR on Base
     },
     "ZCHF": {
         "ethereum": "0xb58e61c3098d85632df34eecfb899a1ed80921cb",
+        "polygon": "0x02567e4b14b25549331fCEe2B56c647A8bAB16FD",
     },
     "stEUR": {
         "ethereum": "0x004626a008b1acdc4c74ab51644093b155e59a23",
+        "base": "0xc0c113f38d0ff010c024c37f471401e05c08ef6c",  # stEUR on Base (Angle)
     },
     "stUSD": {
         "ethereum": "0x0022228a2cc5e7ef0274a7baa600d44da5ab5776",
+        "base": "0xf1c9acdc66974dfb6decb12aa385b9cd01190e38",  # stUSD on Base (Angle)
     },
     "sUSDS": {
         "ethereum": "0xa3931d71877c0e7a3148cb7eb4463524fec27fbd",
