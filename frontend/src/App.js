@@ -1926,6 +1926,62 @@ const TransactionsPage = () => {
     }
   };
 
+  // ==================== Missing Prices Management ====================
+  
+  const fetchTokensWithoutPrices = async () => {
+    try {
+      const response = await api.get("/transactions/tokens-without-prices");
+      setTokensWithoutPrices(response.data.tokens || []);
+    } catch (error) {
+      console.error("Error fetching tokens without prices:", error);
+    }
+  };
+
+  const openPricesDialog = async () => {
+    setPricesDialogOpen(true);
+    await fetchTokensWithoutPrices();
+  };
+
+  const handleFetchAllMissingPrices = async () => {
+    setFetchingPrices(true);
+    try {
+      toast.info("Récupération automatique des prix...");
+      const response = await api.post("/transactions/fetch-missing-prices");
+      if (response.data.updated_count > 0) {
+        toast.success(response.data.message);
+      } else {
+        toast.info("Aucun prix trouvé automatiquement. Utilisez la saisie manuelle.");
+      }
+      fetchTokensWithoutPrices();
+      fetchTransactions();
+    } catch (error) {
+      toast.error("Erreur lors de la récupération des prix");
+    } finally {
+      setFetchingPrices(false);
+    }
+  };
+
+  const handleSetTokenPrice = async (symbol) => {
+    const priceInput = selectedTokenPrice.price_eur;
+    if (!priceInput || isNaN(parseFloat(priceInput))) {
+      toast.error("Veuillez entrer un prix valide");
+      return;
+    }
+
+    try {
+      const response = await api.post("/transactions/set-token-price", {
+        symbol: symbol,
+        price_eur: parseFloat(priceInput)
+      });
+      toast.success(`${response.data.updated_count} transaction(s) mise(s) à jour pour ${symbol}`);
+      setSelectedTokenPrice({ symbol: "", price_eur: "" });
+      fetchTokensWithoutPrices();
+      fetchTransactions();
+    } catch (error) {
+      toast.error("Erreur lors de la mise à jour du prix");
+    }
+  };
+
   const toggleSpam = async (txId) => {
     try {
       const response = await api.patch(`/transactions/${txId}/spam`);
