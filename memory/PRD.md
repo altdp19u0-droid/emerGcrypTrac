@@ -11,7 +11,7 @@ Application de suivi de portefeuille crypto-fiat "emerGcrypTrac" avec les foncti
 - Transactions Fiat ↔ Crypto via passerelles (Prime, Bleap)
 
 ## Application Access
-- **URL**: https://asset-movement-suite.preview.emergentagent.com
+- **URL**: https://wallet-import-tool.preview.emergentagent.com
 - **Test User**: fiatdemo / FiatDemo123
 
 ## Tech Stack
