@@ -1574,6 +1574,12 @@ const TransactionsPage = () => {
   const [compareAddress1, setCompareAddress1] = useState("");
   const [compareAddress2, setCompareAddress2] = useState("");
   
+  // Missing prices management state
+  const [pricesDialogOpen, setPricesDialogOpen] = useState(false);
+  const [tokensWithoutPrices, setTokensWithoutPrices] = useState([]);
+  const [selectedTokenPrice, setSelectedTokenPrice] = useState({ symbol: "", price_eur: "" });
+  const [fetchingPrices, setFetchingPrices] = useState(false);
+  
   // Available assets from transactions
   const [availableAssets, setAvailableAssets] = useState(["USDC", "EURC", "ETH", "MATIC", "EUR", "USD", "CHF"]);
 
