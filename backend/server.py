@@ -153,6 +153,17 @@ def is_spam_token(token_symbol: str, custom_patterns: list = None) -> bool:
     
     return False
 
+async def insert_transaction_with_spam_check(transaction_dict: dict, user_id: str = None):
+    """Insert a transaction with automatic spam detection"""
+    asset = transaction_dict.get("asset", "")
+    
+    # Auto-detect spam if not already marked
+    if "is_spam" not in transaction_dict or transaction_dict["is_spam"] is False:
+        if is_spam_token(asset):
+            transaction_dict["is_spam"] = True
+    
+    await db.transactions.insert_one(transaction_dict)
+
 # Stablecoin mapping
 STABLECOIN_IDS = {
     "USDC": "usd-coin",
