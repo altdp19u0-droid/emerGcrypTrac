@@ -1577,6 +1577,7 @@ const TransactionsPage = () => {
   // Missing prices management state
   const [pricesDialogOpen, setPricesDialogOpen] = useState(false);
   const [tokensWithoutPrices, setTokensWithoutPrices] = useState([]);
+  const [priceStatus, setPriceStatus] = useState(null);
   const [selectedTokenPrice, setSelectedTokenPrice] = useState({ symbol: "", price_eur: "" });
   const [fetchingPrices, setFetchingPrices] = useState(false);
   
