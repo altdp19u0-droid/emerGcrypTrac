@@ -2342,6 +2342,271 @@ async def create_missing_double_entries(current_user: dict = Depends(get_current
         "already_linked": already_exists
     }
 
+@api_router.get("/wallets/{wallet_id}/verify-transactions")
+async def verify_wallet_transactions(wallet_id: str, current_user: dict = Depends(get_current_user)):
+    """
+    Compare transactions in database vs blockchain for a wallet.
+    Returns missing transactions that exist on blockchain but not in DB.
+    """
+    import aiohttp
+    
+    user_id = current_user["id"]
+    
+    # Get wallet
+    wallet = await db.wallets.find_one({"id": wallet_id, "user_id": user_id}, {"_id": 0})
+    if not wallet:
+        raise HTTPException(status_code=404, detail="Wallet not found")
+    
+    network = wallet.get("network", "Ethereum")
+    address = wallet.get("address", "")
+    
+    if not address:
+        raise HTTPException(status_code=400, detail="Wallet has no address")
+    
+    # Only support Blockscout networks for now (Base, Optimism)
+    blockscout_url = BLOCKSCOUT_APIS.get(network)
+    if not blockscout_url:
+        return {
+            "message": f"Vérification non supportée pour le réseau {network}. Seuls Base et Optimism sont supportés.",
+            "supported": False,
+            "missing_transactions": []
+        }
+    
+    # Get existing transaction hashes from DB for this wallet
+    db_transactions = await db.transactions.find(
+        {"wallet_id": wallet_id, "user_id": user_id},
+        {"tx_hash": 1, "asset": 1, "_id": 0}
+    ).to_list(1000)
+    
+    # Create a set of (tx_hash, asset) for quick lookup
+    db_tx_set = set()
+    for tx in db_transactions:
+        if tx.get("tx_hash"):
+            db_tx_set.add((tx["tx_hash"].lower(), tx.get("asset", "").upper()))
+    
+    missing_transactions = []
+    
+    async with aiohttp.ClientSession() as session:
+        # 1. Check native transactions
+        url = f"{blockscout_url}/addresses/{address}/transactions"
+        try:
+            async with session.get(url, timeout=30) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    for tx in data.get("items", []):
+                        tx_hash = tx.get("hash", "").lower()
+                        value = int(tx.get("value", "0"))
+                        value_eth = value / (10 ** 18)
+                        
+                        if value_eth > 0:
+                            native_symbol = CHAIN_SCANNERS.get(network, {}).get("native_symbol", "ETH")
+                            if (tx_hash, native_symbol.upper()) not in db_tx_set:
+                                from_addr = (tx.get("from", {}) or {}).get("hash", "")
+                                to_addr = (tx.get("to", {}) or {}).get("hash", "")
+                                is_incoming = to_addr.lower() == address.lower()
+                                
+                                missing_transactions.append({
+                                    "tx_hash": tx_hash,
+                                    "asset": native_symbol,
+                                    "amount": value_eth if is_incoming else -value_eth,
+                                    "type": "Transfer In" if is_incoming else "Transfer Out",
+                                    "date": tx.get("timestamp", ""),
+                                    "from": from_addr,
+                                    "to": to_addr,
+                                    "reason": "Transaction native non importée"
+                                })
+        except Exception as e:
+            logger.error(f"Error fetching native transactions: {e}")
+        
+        # 2. Check token transfers
+        url = f"{blockscout_url}/addresses/{address}/token-transfers"
+        params = {"type": "ERC-20"}
+        try:
+            async with session.get(url, params=params, timeout=30) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    for tx in data.get("items", []):
+                        tx_hash = tx.get("transaction_hash", "").lower()
+                        token = tx.get("token", {}) or {}
+                        symbol = (token.get("symbol", "") or "UNKNOWN").upper()
+                        decimals = int(token.get("decimals") or 18)
+                        
+                        total = tx.get("total", {}) or {}
+                        value_raw = total.get("value", "0")
+                        amount = float(value_raw) / (10 ** decimals) if value_raw else 0
+                        
+                        if tx_hash and (tx_hash, symbol) not in db_tx_set:
+                            from_addr = (tx.get("from", {}) or {}).get("hash", "")
+                            to_addr = (tx.get("to", {}) or {}).get("hash", "")
+                            is_incoming = to_addr.lower() == address.lower()
+                            
+                            missing_transactions.append({
+                                "tx_hash": tx_hash,
+                                "asset": symbol,
+                                "amount": amount if is_incoming else -amount,
+                                "type": "Transfer In" if is_incoming else "Transfer Out",
+                                "date": tx.get("timestamp", ""),
+                                "from": from_addr,
+                                "to": to_addr,
+                                "reason": "Token transfer non importé"
+                            })
+        except Exception as e:
+            logger.error(f"Error fetching token transfers: {e}")
+    
+    return {
+        "message": f"{len(missing_transactions)} transaction(s) manquante(s) détectée(s)",
+        "supported": True,
+        "wallet_name": wallet.get("name"),
+        "network": network,
+        "db_transaction_count": len(db_transactions),
+        "missing_count": len(missing_transactions),
+        "missing_transactions": missing_transactions[:50]  # Limit to 50 for response size
+    }
+
+@api_router.post("/wallets/{wallet_id}/import-missing")
+async def import_missing_transactions(wallet_id: str, tx_hashes: list[str], current_user: dict = Depends(get_current_user)):
+    """
+    Import specific missing transactions by their hashes.
+    """
+    import aiohttp
+    
+    user_id = current_user["id"]
+    
+    # Get wallet
+    wallet = await db.wallets.find_one({"id": wallet_id, "user_id": user_id}, {"_id": 0})
+    if not wallet:
+        raise HTTPException(status_code=404, detail="Wallet not found")
+    
+    network = wallet.get("network", "Ethereum")
+    address = wallet.get("address", "")
+    wallet_name = wallet.get("name", "")
+    
+    blockscout_url = BLOCKSCOUT_APIS.get(network)
+    if not blockscout_url:
+        raise HTTPException(status_code=400, detail=f"Réseau {network} non supporté")
+    
+    imported_count = 0
+    errors = []
+    
+    async with aiohttp.ClientSession() as session:
+        for tx_hash in tx_hashes:
+            try:
+                # Check if already exists
+                existing = await db.transactions.find_one({
+                    "tx_hash": tx_hash.lower(),
+                    "user_id": user_id,
+                    "wallet_id": wallet_id
+                })
+                
+                if existing:
+                    continue
+                
+                # Fetch transaction details from Blockscout
+                url = f"{blockscout_url}/transactions/{tx_hash}"
+                async with session.get(url, timeout=30) as response:
+                    if response.status == 200:
+                        tx_data = await response.json()
+                        
+                        # Determine if it's a token transfer or native
+                        token_transfers = tx_data.get("token_transfers", [])
+                        
+                        if token_transfers:
+                            # Import token transfers
+                            for tt in token_transfers:
+                                token = tt.get("token", {}) or {}
+                                symbol = token.get("symbol", "UNKNOWN")
+                                decimals = int(token.get("decimals") or 18)
+                                
+                                total = tt.get("total", {}) or {}
+                                value_raw = total.get("value", "0")
+                                amount = float(value_raw) / (10 ** decimals) if value_raw else 0
+                                
+                                from_addr = (tt.get("from", {}) or {}).get("hash", "")
+                                to_addr = (tt.get("to", {}) or {}).get("hash", "")
+                                is_incoming = to_addr.lower() == address.lower()
+                                
+                                # Check if this specific token transfer exists
+                                existing_tt = await db.transactions.find_one({
+                                    "tx_hash": tx_hash.lower(),
+                                    "user_id": user_id,
+                                    "asset": symbol
+                                })
+                                
+                                if not existing_tt:
+                                    try:
+                                        tx_date = datetime.fromisoformat(tx_data.get("timestamp", "").replace("Z", "+00:00"))
+                                    except:
+                                        tx_date = datetime.now(timezone.utc)
+                                    
+                                    transaction = Transaction(
+                                        user_id=user_id,
+                                        type="Transfer In" if is_incoming else "Transfer Out",
+                                        asset=symbol,
+                                        amount=amount if is_incoming else -amount,
+                                        price_usd=1.0,  # Will need manual price adjustment
+                                        price_eur=0.92,
+                                        value_usd=amount,
+                                        value_eur=amount * 0.92,
+                                        fees=0,
+                                        wallet_id=wallet_id,
+                                        wallet_name=wallet_name,
+                                        source="manual_import",
+                                        date=tx_date.strftime("%Y-%m-%d"),
+                                        tx_hash=tx_hash.lower(),
+                                        counterparty_wallet=from_addr if is_incoming else to_addr,
+                                        notes="Import manuel - vérifier le prix"
+                                    )
+                                    
+                                    await db.transactions.insert_one(transaction.model_dump())
+                                    imported_count += 1
+                        else:
+                            # Native transaction
+                            value = int(tx_data.get("value", "0"))
+                            value_eth = value / (10 ** 18)
+                            
+                            if value_eth > 0:
+                                from_addr = (tx_data.get("from", {}) or {}).get("hash", "")
+                                to_addr = (tx_data.get("to", {}) or {}).get("hash", "")
+                                is_incoming = to_addr.lower() == address.lower()
+                                native_symbol = CHAIN_SCANNERS.get(network, {}).get("native_symbol", "ETH")
+                                
+                                try:
+                                    tx_date = datetime.fromisoformat(tx_data.get("timestamp", "").replace("Z", "+00:00"))
+                                except:
+                                    tx_date = datetime.now(timezone.utc)
+                                
+                                transaction = Transaction(
+                                    user_id=user_id,
+                                    type="Transfer In" if is_incoming else "Transfer Out",
+                                    asset=native_symbol,
+                                    amount=value_eth if is_incoming else -value_eth,
+                                    price_usd=2500,
+                                    price_eur=2300,
+                                    value_usd=value_eth * 2500,
+                                    value_eur=value_eth * 2300,
+                                    fees=0,
+                                    wallet_id=wallet_id,
+                                    wallet_name=wallet_name,
+                                    source="manual_import",
+                                    date=tx_date.strftime("%Y-%m-%d"),
+                                    tx_hash=tx_hash.lower(),
+                                    counterparty_wallet=from_addr if is_incoming else to_addr,
+                                    notes="Import manuel - vérifier le prix"
+                                )
+                                
+                                await db.transactions.insert_one(transaction.model_dump())
+                                imported_count += 1
+                    else:
+                        errors.append(f"{tx_hash[:10]}...: Erreur API ({response.status})")
+            except Exception as e:
+                errors.append(f"{tx_hash[:10]}...: {str(e)}")
+    
+    return {
+        "message": f"{imported_count} transaction(s) importée(s)",
+        "imported_count": imported_count,
+        "errors": errors if errors else None
+    }
+
 @api_router.post("/transactions/fetch-fees")
 async def fetch_missing_fees(current_user: dict = Depends(get_current_user)):
     """Fetch and update fees for transactions that have tx_hash but fees=0"""
