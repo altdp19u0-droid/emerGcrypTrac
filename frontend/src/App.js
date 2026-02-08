@@ -785,6 +785,77 @@ const WalletsPage = () => {
     }
   };
 
+  const handleVerifyTransactions = async (wallet) => {
+    setVerifyingWallet(wallet);
+    setMissingTransactions([]);
+    setSelectedMissingTx([]);
+    setVerifyDialogOpen(true);
+    
+    try {
+      toast.info("Vérification en cours...");
+      const response = await api.get(`/wallets/${wallet.id}/verify-transactions`);
+      
+      if (!response.data.supported) {
+        toast.warning(response.data.message);
+        setVerifyDialogOpen(false);
+        return;
+      }
+      
+      setMissingTransactions(response.data.missing_transactions || []);
+      
+      if (response.data.missing_count === 0) {
+        toast.success("Aucune transaction manquante !");
+      } else {
+        toast.info(`${response.data.missing_count} transaction(s) manquante(s) détectée(s)`);
+      }
+    } catch (error) {
+      toast.error("Erreur lors de la vérification");
+      setVerifyDialogOpen(false);
+    }
+  };
+
+  const handleImportSelectedMissing = async () => {
+    if (selectedMissingTx.length === 0) {
+      toast.warning("Sélectionnez au moins une transaction à importer");
+      return;
+    }
+    
+    setImportingMissing(true);
+    try {
+      const response = await api.post(`/wallets/${verifyingWallet.id}/import-missing`, selectedMissingTx);
+      toast.success(response.data.message);
+      
+      // Re-verify to update the list
+      const verifyResponse = await api.get(`/wallets/${verifyingWallet.id}/verify-transactions`);
+      setMissingTransactions(verifyResponse.data.missing_transactions || []);
+      setSelectedMissingTx([]);
+      
+      if (response.data.errors && response.data.errors.length > 0) {
+        console.warn("Import errors:", response.data.errors);
+      }
+    } catch (error) {
+      toast.error("Erreur lors de l'import");
+    } finally {
+      setImportingMissing(false);
+    }
+  };
+
+  const toggleSelectMissingTx = (txHash) => {
+    setSelectedMissingTx(prev => 
+      prev.includes(txHash) 
+        ? prev.filter(h => h !== txHash)
+        : [...prev, txHash]
+    );
+  };
+
+  const selectAllMissingTx = () => {
+    if (selectedMissingTx.length === missingTransactions.length) {
+      setSelectedMissingTx([]);
+    } else {
+      setSelectedMissingTx(missingTransactions.map(tx => tx.tx_hash));
+    }
+  };
+
   const syncFromBlockchain = async (walletId, apiKey = null) => {
     setSyncing(walletId);
     try {
