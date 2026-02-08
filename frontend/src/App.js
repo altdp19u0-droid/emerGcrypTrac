@@ -2255,7 +2255,17 @@ const TransactionsPage = () => {
                                     toast.success("Adresse copiée !");
                                   }}
                                 />
+                                <ExternalLink 
+                                  size={12} 
+                                  className="cursor-pointer hover:text-green-400 transition-colors" 
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const url = getExplorerAddressUrl(tx.counterparty_wallet, tx.wallet_name);
+                                    if (url) window.open(url, "_blank");
+                                  }}
+                                />
                               </div>
+                              <p className="text-xs text-muted-foreground mt-1">Cliquez pour classifier</p>
                             </TooltipContent>
                           </Tooltip>
                         </TooltipProvider>
