@@ -4483,15 +4483,21 @@ async def get_pnl_report(current_user: dict = Depends(get_current_user)):
                 # Add to FIFO queue
                 cost_per_unit = price_eur + (fee_eur / abs_amount if abs_amount > 0 else 0)
                 fifo_queue.append({"amount": abs_amount, "cost": cost_per_unit})
-                total_bought += abs_amount
-                total_cost_eur += abs_amount * price_eur + fee_eur
+                
+                # Only count in Total Bought if NOT an internal transfer
+                if not internal_transfer:
+                    total_bought += abs_amount
+                    total_cost_eur += abs_amount * price_eur + fee_eur
                 
             elif tx_type in ["Transfer Out", "Sell"]:
                 # Amount is negative for sells, use absolute value
                 abs_amount = abs(amount)
-                total_sold += abs_amount
                 proceeds = abs_amount * price_eur - fee_eur
-                total_proceeds_eur += proceeds
+                
+                # Only count in Total Sold if NOT an internal transfer
+                if not internal_transfer:
+                    total_sold += abs_amount
+                    total_proceeds_eur += proceeds
                 
                 # Calculate cost basis using FIFO
                 remaining = abs_amount
