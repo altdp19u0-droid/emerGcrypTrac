@@ -72,6 +72,13 @@ Application de suivi de portefeuille crypto/fiat pour le calcul des impôts. Foc
   - 168 transactions spam marquées, 76 tokens spam détectés
   - Endpoints: `/api/spam-tokens/*`
 
+- ✅ Interface de gestion des prix manquants
+  - Bouton "Prix Manquants" sur page Transactions
+  - Liste tokens sans prix avec saisie manuelle
+  - Auto-fetch via DeFiLlama
+  - Endpoints: `/api/transactions/set-token-price`, `/api/transactions/tokens-without-prices`
+  - Tests: 8LNDS (38 tx), ZCHF (23 tx) mis à jour
+
 ### Précédemment implémenté
 - Flux Achat/Vente Crypto depuis Fiat
 - UI Transactions: colonnes Source/Destination corrigées, Libellé ajouté
