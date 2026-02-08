@@ -1865,6 +1865,92 @@ async def update_transaction_category(tx_id: str, data: IncomeCategoryUpdate, cu
         "income_category": category_value
     }
 
+@api_router.post("/transactions/fetch-fees")
+async def fetch_missing_fees(current_user: dict = Depends(get_current_user)):
+    """Fetch and update fees for transactions that have tx_hash but fees=0"""
+    import aiohttp
+    
+    # Find transactions with tx_hash but no fees
+    transactions = await db.transactions.find({
+        "user_id": current_user["id"],
+        "tx_hash": {"$ne": None, "$ne": ""},
+        "$or": [{"fees": 0}, {"fees": {"$exists": False}}, {"fees": None}]
+    }, {"_id": 0}).to_list(500)
+    
+    if not transactions:
+        return {"message": "Aucune transaction à mettre à jour", "updated_count": 0}
+    
+    # Group transactions by wallet to get network info
+    wallet_ids = list(set(tx.get("wallet_id") for tx in transactions if tx.get("wallet_id")))
+    wallets = {}
+    for wid in wallet_ids:
+        wallet = await db.wallets.find_one({"id": wid}, {"_id": 0})
+        if wallet:
+            wallets[wid] = wallet
+    
+    updated_count = 0
+    errors = []
+    
+    async with aiohttp.ClientSession() as session:
+        for tx in transactions:
+            tx_hash = tx.get("tx_hash")
+            wallet = wallets.get(tx.get("wallet_id"), {})
+            network = wallet.get("network", "Ethereum")
+            
+            # Get the appropriate API URL
+            blockscout_url = BLOCKSCOUT_APIS.get(network)
+            if not blockscout_url:
+                # Fallback to etherscan-like APIs
+                if network == "Ethereum":
+                    continue  # Would need Etherscan API key
+                errors.append(f"Réseau non supporté: {network}")
+                continue
+            
+            try:
+                # Fetch transaction details from Blockscout
+                url = f"{blockscout_url}/transactions/{tx_hash}"
+                async with session.get(url, timeout=10) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        
+                        # Extract gas info
+                        gas_used = float(data.get("gas_used", 0))
+                        gas_price = float(data.get("gas_price", 0))
+                        
+                        if gas_used > 0 and gas_price > 0:
+                            fees_eth = gas_used * gas_price / (10 ** 18)
+                            
+                            # Get ETH price in EUR (approximate)
+                            eth_price_eur = 2500  # Default fallback
+                            try:
+                                price_url = f"{blockscout_url}/stats"
+                                async with session.get(price_url, timeout=5) as price_resp:
+                                    if price_resp.status == 200:
+                                        price_data = await price_resp.json()
+                                        eth_price_eur = float(price_data.get("coin_price", 2500))
+                            except:
+                                pass
+                            
+                            fees_eur = fees_eth * eth_price_eur
+                            
+                            # Update transaction
+                            await db.transactions.update_one(
+                                {"id": tx["id"]},
+                                {"$set": {"fees": fees_eur, "fees_currency": "EUR"}}
+                            )
+                            updated_count += 1
+                    else:
+                        errors.append(f"Erreur API pour {tx_hash[:10]}...: {response.status}")
+            except Exception as e:
+                errors.append(f"Erreur pour {tx_hash[:10]}...: {str(e)}")
+    
+    return {
+        "message": f"{updated_count} transaction(s) mise(s) à jour",
+        "updated_count": updated_count,
+        "total_checked": len(transactions),
+        "errors": errors[:10] if errors else []  # Limit error messages
+    }
+
 @api_router.post("/transactions/import-csv")
 async def import_csv_transactions(import_data: CSVImportRequest, current_user: dict = Depends(get_current_user)):
     """Import transactions from CSV"""
