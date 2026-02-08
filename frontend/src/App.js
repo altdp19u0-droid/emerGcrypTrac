@@ -2292,7 +2292,7 @@ const TransactionsPage = () => {
                                     >
                                       {getAddressColor(tx.counterparty_wallet) === "trusted" && <Shield size={12} className="inline mr-1" />}
                                       {getAddressColor(tx.counterparty_wallet) === "suspicious" && <AlertTriangle size={12} className="inline mr-1" />}
-                                      {tx.counterparty_wallet.substring(0, 10)}...
+                                      {getWalletNameForAddress(tx.counterparty_wallet) || tx.counterparty_wallet.substring(0, 10) + "..."}
                                     </button>
                                   </DropdownMenuTrigger>
                                   <DropdownMenuContent style={{ backgroundColor: '#27272a', color: '#fafafa' }}>
