@@ -1800,16 +1800,17 @@ const TransactionsPage = () => {
               placeholder="Adresse 1 (coller ici)" 
               value={compareAddress1}
               onChange={(e) => setCompareAddress1(e.target.value.trim())}
-              className="flex-1 font-mono text-xs"
-              style={{ maxWidth: '320px' }}
+              className="font-mono text-xs"
+              style={{ width: '420px', minWidth: '420px' }}
             />
+            <span className="text-muted-foreground">&</span>
             <Input 
               type="text" 
               placeholder="Adresse 2 (coller ici)" 
               value={compareAddress2}
               onChange={(e) => setCompareAddress2(e.target.value.trim())}
-              className="flex-1 font-mono text-xs"
-              style={{ maxWidth: '320px' }}
+              className="font-mono text-xs"
+              style={{ width: '420px', minWidth: '420px' }}
             />
             {/* Comparison indicator */}
             {(compareAddress1 || compareAddress2) && (
