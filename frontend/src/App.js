@@ -5533,6 +5533,112 @@ const ReportsPage = () => {
         </div>
       </div>
 
+      {/* Section DeFi */}
+      {Object.keys(defiPositions).length > 0 && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold mb-3 text-zinc-300 flex items-center gap-2">
+            <Layers size={20} className="text-purple-400" />
+            Positions DeFi
+            <Badge variant="outline" className="text-xs text-muted-foreground ml-2">Non imposable tant que non vendu</Badge>
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+            <Card className="bg-gradient-to-br from-blue-900/30 to-blue-800/10 border-blue-500/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-zinc-400">Capital Investi</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-400">
+                  €{totalDefiDeposits.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-gradient-to-br from-green-900/30 to-green-800/10 border-green-500/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-zinc-400">Rewards Accumulés</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-400">
+                  €{totalDefiRewards.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+                </div>
+                <p className="text-xs text-zinc-500 mt-1">Non réalisé</p>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-gradient-to-br from-amber-900/30 to-amber-800/10 border-amber-500/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-zinc-400">Retraits</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-amber-400">
+                  €{totalDefiWithdrawals.toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+                </div>
+              </CardContent>
+            </Card>
+            
+            <Card className="bg-gradient-to-br from-purple-900/30 to-purple-800/10 border-purple-500/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-zinc-400">ROI</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${defiROI >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                  {defiROI >= 0 ? '+' : ''}{defiROI.toFixed(1)}%
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          {/* Détail par protocole */}
+          <Card>
+            <CardContent className="pt-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Protocole</TableHead>
+                    <TableHead className="text-right">Investi</TableHead>
+                    <TableHead className="text-right">Rewards</TableHead>
+                    <TableHead className="text-right">ROI</TableHead>
+                    <TableHead className="text-right">Période</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {Object.entries(defiPositions).map(([key, pos]) => {
+                    const roi = pos.total_deposits_eur > 0 
+                      ? (pos.total_rewards_eur / pos.total_deposits_eur) * 100 
+                      : 0;
+                    return (
+                      <TableRow key={key} className="text-zinc-100">
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-2">
+                            <Layers size={16} className="text-purple-400" />
+                            {pos.name}
+                          </div>
+                        </TableCell>
+                        <TableCell className="text-right text-blue-400">
+                          €{(pos.total_deposits_eur || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="text-right text-green-400">
+                          €{(pos.total_rewards_eur || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className={`text-right font-mono ${roi >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {roi >= 0 ? '+' : ''}{roi.toFixed(1)}%
+                        </TableCell>
+                        <TableCell className="text-right text-xs text-zinc-400">
+                          {pos.first_activity?.slice(0, 10)} → {pos.last_activity?.slice(0, 10)}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              <p className="text-xs text-muted-foreground mt-3 text-center">
+                ⚠️ Les rewards DeFi ne sont imposables qu'en cas de conversion vers EUR (plus-value)
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Section Activité */}
       <div className="mb-6">
         <h2 className="text-lg font-semibold mb-3 text-zinc-300">Activité des Transactions</h2>
