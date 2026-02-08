@@ -5400,6 +5400,257 @@ async def get_pnl_report(current_user: dict = Depends(get_current_user)):
         }
     }
 
+# ==================== DEFI POSITIONS & AUTO-CATEGORIZATION ====================
+
+@api_router.post("/defi/auto-categorize")
+async def auto_categorize_transactions(current_user: dict = Depends(get_current_user)):
+    """
+    Auto-categorize transactions based on known DeFi protocol addresses.
+    Updates income_category and links to positions.
+    """
+    user_id = current_user["id"]
+    
+    # Get all transactions that could be DeFi related
+    transactions = await db.transactions.find({
+        "user_id": user_id,
+        "is_spam": {"$ne": True}
+    }).to_list(10000)
+    
+    categorized = 0
+    by_protocol = {}
+    
+    for tx in transactions:
+        result = categorize_transaction_by_address(tx)
+        if result:
+            update_fields = {
+                "defi_protocol": result["protocol"],
+                "defi_protocol_name": result["protocol_name"]
+            }
+            
+            # Set category based on type
+            if result["category"] == "income":
+                update_fields["income_category"] = result["income_type"]  # yield, interest
+            elif result["category"] == "deposit":
+                update_fields["expense_category"] = "investment"
+            elif result["category"] == "withdrawal":
+                update_fields["income_category"] = "capital_return"
+            
+            await db.transactions.update_one(
+                {"_id": tx["_id"]},
+                {"$set": update_fields}
+            )
+            
+            categorized += 1
+            protocol = result["protocol"]
+            if protocol not in by_protocol:
+                by_protocol[protocol] = {"count": 0, "categories": {}}
+            by_protocol[protocol]["count"] += 1
+            cat = result["category"]
+            by_protocol[protocol]["categories"][cat] = by_protocol[protocol]["categories"].get(cat, 0) + 1
+    
+    return {
+        "message": f"{categorized} transaction(s) catégorisée(s) automatiquement",
+        "categorized_count": categorized,
+        "by_protocol": by_protocol
+    }
+
+@api_router.get("/defi/positions")
+async def get_defi_positions(current_user: dict = Depends(get_current_user)):
+    """
+    Get DeFi positions summary calculated from transactions.
+    """
+    user_id = current_user["id"]
+    
+    # Aggregate transactions by DeFi protocol
+    pipeline = [
+        {
+            "$match": {
+                "user_id": user_id,
+                "is_spam": {"$ne": True},
+                "defi_protocol": {"$exists": True, "$ne": None}
+            }
+        },
+        {
+            "$group": {
+                "_id": {
+                    "protocol": "$defi_protocol",
+                    "asset": "$asset",
+                    "category": "$income_category"
+                },
+                "total_amount": {"$sum": "$amount"},
+                "total_value_eur": {"$sum": {"$multiply": [{"$abs": "$amount"}, {"$ifNull": ["$price_eur", 0]}]}},
+                "count": {"$sum": 1},
+                "first_date": {"$min": "$date"},
+                "last_date": {"$max": "$date"}
+            }
+        },
+        {"$sort": {"_id.protocol": 1, "_id.asset": 1}}
+    ]
+    
+    results = await db.transactions.aggregate(pipeline).to_list(1000)
+    
+    # Organize by protocol
+    positions = {}
+    for r in results:
+        protocol = r["_id"]["protocol"]
+        asset = r["_id"]["asset"]
+        category = r["_id"]["category"]
+        
+        if protocol not in positions:
+            positions[protocol] = {
+                "name": DEFI_PROTOCOL_ADDRESSES.get(protocol, {}).get("name", protocol),
+                "assets": {},
+                "total_deposits_eur": 0,
+                "total_withdrawals_eur": 0,
+                "total_rewards_eur": 0,
+                "first_activity": None,
+                "last_activity": None
+            }
+        
+        if asset not in positions[protocol]["assets"]:
+            positions[protocol]["assets"][asset] = {
+                "deposits": 0,
+                "withdrawals": 0,
+                "rewards": 0,
+                "net_position": 0
+            }
+        
+        amount = r["total_amount"]
+        value_eur = r["total_value_eur"]
+        
+        if category in ["yield", "interest"]:
+            positions[protocol]["assets"][asset]["rewards"] += abs(amount)
+            positions[protocol]["total_rewards_eur"] += value_eur
+        elif category == "capital_return":
+            positions[protocol]["assets"][asset]["withdrawals"] += abs(amount)
+            positions[protocol]["total_withdrawals_eur"] += value_eur
+        elif amount > 0:
+            positions[protocol]["assets"][asset]["deposits"] += abs(amount)
+            positions[protocol]["total_deposits_eur"] += value_eur
+        
+        # Track dates
+        if positions[protocol]["first_activity"] is None or r["first_date"] < positions[protocol]["first_activity"]:
+            positions[protocol]["first_activity"] = r["first_date"]
+        if positions[protocol]["last_activity"] is None or r["last_date"] > positions[protocol]["last_activity"]:
+            positions[protocol]["last_activity"] = r["last_date"]
+    
+    # Calculate net positions
+    for protocol, data in positions.items():
+        for asset, asset_data in data["assets"].items():
+            asset_data["net_position"] = asset_data["deposits"] + asset_data["rewards"] - asset_data["withdrawals"]
+    
+    return {"positions": positions}
+
+@api_router.get("/defi/position/{protocol}")
+async def get_defi_position_detail(protocol: str, current_user: dict = Depends(get_current_user)):
+    """
+    Get detailed position for a specific DeFi protocol with transaction history.
+    """
+    user_id = current_user["id"]
+    
+    # Get all transactions for this protocol
+    transactions = await db.transactions.find({
+        "user_id": user_id,
+        "defi_protocol": protocol.upper(),
+        "is_spam": {"$ne": True}
+    }, {"_id": 0}).sort("date", 1).to_list(10000)
+    
+    if not transactions:
+        raise HTTPException(status_code=404, detail=f"No transactions found for protocol {protocol}")
+    
+    # Calculate position summary
+    summary = {
+        "protocol": protocol,
+        "name": DEFI_PROTOCOL_ADDRESSES.get(protocol.upper(), {}).get("name", protocol),
+        "total_deposits": 0,
+        "total_withdrawals": 0,
+        "total_rewards": 0,
+        "total_deposits_eur": 0,
+        "total_withdrawals_eur": 0,
+        "total_rewards_eur": 0,
+        "by_asset": {},
+        "transactions_count": len(transactions),
+        "first_activity": transactions[0].get("date") if transactions else None,
+        "last_activity": transactions[-1].get("date") if transactions else None
+    }
+    
+    for tx in transactions:
+        asset = tx.get("asset", "UNKNOWN")
+        amount = abs(tx.get("amount", 0))
+        price_eur = tx.get("price_eur", 0)
+        value_eur = amount * price_eur
+        category = tx.get("income_category", "")
+        expense_cat = tx.get("expense_category", "")
+        
+        if asset not in summary["by_asset"]:
+            summary["by_asset"][asset] = {
+                "deposits": 0, "withdrawals": 0, "rewards": 0,
+                "deposits_eur": 0, "withdrawals_eur": 0, "rewards_eur": 0
+            }
+        
+        if category in ["yield", "interest"]:
+            summary["by_asset"][asset]["rewards"] += amount
+            summary["by_asset"][asset]["rewards_eur"] += value_eur
+            summary["total_rewards"] += amount
+            summary["total_rewards_eur"] += value_eur
+        elif category == "capital_return":
+            summary["by_asset"][asset]["withdrawals"] += amount
+            summary["by_asset"][asset]["withdrawals_eur"] += value_eur
+            summary["total_withdrawals"] += amount
+            summary["total_withdrawals_eur"] += value_eur
+        elif expense_cat == "investment" or tx.get("type") == "Transfer Out":
+            summary["by_asset"][asset]["deposits"] += amount
+            summary["by_asset"][asset]["deposits_eur"] += value_eur
+            summary["total_deposits"] += amount
+            summary["total_deposits_eur"] += value_eur
+    
+    # Calculate ROI
+    if summary["total_deposits_eur"] > 0:
+        summary["roi_percent"] = (summary["total_rewards_eur"] / summary["total_deposits_eur"]) * 100
+    else:
+        summary["roi_percent"] = 0
+    
+    return {
+        "summary": summary,
+        "transactions": transactions
+    }
+
+@api_router.post("/defi/link-position")
+async def link_transactions_to_position(request: dict, current_user: dict = Depends(get_current_user)):
+    """
+    Manually link transactions to a DeFi position/protocol.
+    """
+    user_id = current_user["id"]
+    tx_ids = request.get("transaction_ids", [])
+    protocol = request.get("protocol", "").upper()
+    category = request.get("category")  # yield, interest, investment, capital_return
+    
+    if not tx_ids or not protocol:
+        raise HTTPException(status_code=400, detail="transaction_ids and protocol are required")
+    
+    update_fields = {
+        "defi_protocol": protocol,
+        "defi_protocol_name": DEFI_PROTOCOL_ADDRESSES.get(protocol, {}).get("name", protocol)
+    }
+    
+    if category:
+        if category in ["yield", "interest"]:
+            update_fields["income_category"] = category
+        elif category == "investment":
+            update_fields["expense_category"] = "investment"
+        elif category == "capital_return":
+            update_fields["income_category"] = "capital_return"
+    
+    result = await db.transactions.update_many(
+        {"user_id": user_id, "id": {"$in": tx_ids}},
+        {"$set": update_fields}
+    )
+    
+    return {
+        "message": f"{result.modified_count} transaction(s) liée(s) à {protocol}",
+        "updated_count": result.modified_count
+    }
+
 # ==================== EXPORT ENDPOINT ====================
 
 @api_router.get("/export/transactions")
