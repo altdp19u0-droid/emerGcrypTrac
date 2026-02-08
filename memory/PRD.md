@@ -60,6 +60,18 @@ Application de suivi de portefeuille crypto/fiat pour le calcul des impôts. Foc
   - Lien explorer dynamique selon le réseau
   - Endpoints: `GET /wallets/{id}/verify-transactions`, `POST /wallets/{id}/import-missing`
 
+- ✅ Bug fix: Calcul portfolio incorrect ($152k → $6.6k)
+  - Les montants étaient doublement comptés (signés + type)
+  - Corrigé pour utiliser uniquement les montants signés
+
+- ✅ Système de gestion des tokens SPAM
+  - Détection automatique via patterns (t.me, claim, airdrop, caractères cyrilliques, etc.)
+  - Interface de gestion dans le Dashboard (bouton "Spam")
+  - Onglets: Liste spam + Prévisualisation
+  - Actions: Scanner, Marquer/Retirer du spam
+  - 168 transactions spam marquées, 76 tokens spam détectés
+  - Endpoints: `/api/spam-tokens/*`
+
 ### Précédemment implémenté
 - Flux Achat/Vente Crypto depuis Fiat
 - UI Transactions: colonnes Source/Destination corrigées, Libellé ajouté
