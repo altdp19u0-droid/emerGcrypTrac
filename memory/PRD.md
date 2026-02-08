@@ -1,115 +1,83 @@
 # CryptoTrack - Product Requirements Document
 
 ## Original Problem Statement
-Application de suivi de portefeuille crypto-fiat "emerGcrypTrac" avec les fonctionnalités suivantes :
-- Gestion des comptes Fiat et transactions
-- Gestion des wallets crypto et transactions
-- Page Positions/Investissements pour DeFi/CeFi
-- Export CSV et PDF fiscal
-- Double-entry accounting pour les transferts
-- Exclusion des transactions spam des rapports
-- Transactions Fiat ↔ Crypto via passerelles (Prime, Bleap)
+Application de suivi de portefeuille crypto/fiat pour le calcul des impôts. Focus sur les opérations on-ramp/off-ramp (Prime neverless, Bleap wallet) pour convertir EUR ↔ crypto (EURC, USDC, etc.).
 
-## Application Access
-- **URL**: https://wallet-import-tool.preview.emergentagent.com
-- **Test User**: fiatdemo / FiatDemo123
+## User Persona
+- Utilisateur techniquement compétent
+- Besoin de traçabilité fiscale complète
+- Utilise plusieurs wallets sur différentes chaînes (Ethereum, Polygon, Base, Arbitrum, Optimism)
+- Langue préférée: Français
+
+## Core Requirements
+
+### Wallets & Synchronisation
+- [x] Gestion multi-wallets (blockchain + manuels)
+- [x] Synchronisation via Etherscan API (ETH, Polygon, Arbitrum)
+- [x] Synchronisation via Blockscout (Base, Optimism) - gratuit
+- [x] **Vérification des transactions manquantes** avec import manuel
+
+### Transactions Crypto
+- [x] Types: Buy, Sell, Transfer In, Transfer Out
+- [x] Libellé/Catégorie (Interest, Yield, Airdrop, Fees, etc.)
+- [x] Classification des adresses (trusted/suspect)
+- [x] Double-entry pour transferts internes
+- [x] Récupération des frais de gas manquants
+- [x] Export CSV avec filtres
+
+### Transactions Fiat
+- [x] Comptes fiat multiples
+- [x] Achat/Vente crypto depuis fiat (liaison automatique)
+- [x] Dépôts/Retraits
+
+### Rapports & Fiscalité
+- [x] Page Rapports avec calcul P&L (méthode FIFO)
+- [x] Export PDF fiscal
+- [x] Page P&L détaillée
 
 ## Tech Stack
-- **Frontend**: React, Tailwind CSS, shadcn/ui, lucide-react
-- **Backend**: FastAPI, Pydantic, Motor (async MongoDB)
-- **Database**: MongoDB
-- **Auth**: JWT-based
+- **Backend**: FastAPI, MongoDB, Pydantic
+- **Frontend**: React, TypeScript, Vite, Shadcn UI, Tailwind CSS
+- **APIs**: CoinGecko (prix), Etherscan, Blockscout
 
-## What's Been Implemented
+## Credentials Test
+- Username: `fiatdemo`
+- Password: `FiatDemo123`
 
-### Core Features (Completed)
-- [x] User authentication (JWT)
-- [x] Dashboard with portfolio overview
-- [x] Wallet management (CRUD)
-- [x] Crypto transactions (CRUD + edit)
-- [x] Fiat accounts management (CRUD)
-- [x] Fiat transactions (CRUD + edit + delete)
-- [x] Positions/Investments page with movements
-- [x] P&L Report (FIFO method)
-- [x] Spam transaction filtering from P&L
-- [x] CSV exports (accounts, transactions, positions)
-- [x] PDF fiscal report generation
-- [x] Double-entry: Fiat ↔ Fiat transfers
-- [x] Double-entry: Fiat → Crypto Wallet transfers
-- [x] **NEW**: Fiat ↔ Crypto via Passerelles (Prime, Bleap, etc.)
+---
 
-### Fiat-to-Crypto Conversion Feature (2026-02-07)
-- [x] **crypto_buy**: EUR → Crypto achat via passerelle
-  - Crée transaction fiat (débit compte bancaire)
-  - Crée automatiquement transaction crypto "Buy" dans le wallet de destination
-  - Asset crypto et montant configurables (EURC, USDC, EURA, etc.)
-- [x] **crypto_sell**: Crypto → EUR vente via passerelle
-  - Crée transaction fiat (crédit compte bancaire)
-  - Crée automatiquement transaction crypto "Sell" dans le wallet source
-- [x] Frontend: Section dédiée "Crypto Reçue/Vendue" avec sélecteur de wallet, dropdown asset, montant crypto
-- [x] Backend: Liaison automatique via `linked_crypto_tx_id`
+## Changelog
 
-### UI Fixes (Completed)
-- [x] Fixed invisible text on buttons
-- [x] Fixed invisible text on select dropdowns
-- [x] Fixed P&L table text visibility
-- [x] Fixed Total Fees color visibility (orange-500)
+### 2025-02-08
+- ✅ Terminé: Fonctionnalité "Vérification des Transactions Manquantes"
+  - Bouton "Vérifier" sur chaque wallet
+  - Dialog avec liste des transactions manquantes
+  - Checkboxes + import sélectif
+  - Endpoints: `GET /wallets/{id}/verify-transactions`, `POST /wallets/{id}/import-missing`
 
-### Spam Cleanup (Completed - 2026-02-07)
-- [x] Marked 76+ transactions as spam (fake USDC, scam tokens)
-- [x] P&L report now shows only 10 legitimate assets
-- [x] Spam excluded: UЅDС, ꓴꓢꓓС, USDⅭ, openAI, GPT, BSX, Meow, SHIT, UNKNOWN, KIMO, DAS, MIM, KEKIUS, GUYS, DKP, BUSD, FUN, SENT, HORSE, NEXFI, AZTEC, DROID, EPSTEIN, FT
+### Précédemment implémenté
+- Flux Achat/Vente Crypto depuis Fiat
+- UI Transactions: colonnes Source/Destination corrigées, Libellé ajouté
+- Classification adresses avec icônes copy/explorer
+- Bug fix page Rapports
+- Export CSV avec filtres
+- Récupération frais de gas
+- Double-entry transferts internes
+- Marquage auto wallets utilisateur comme "trusted"
 
-## Pending Tasks
+---
 
-### P0 - Critical
-- None currently
+## Roadmap / Backlog
 
-### P1 - High Priority
-- User-Managed Spam List: UI to manage spam assets (currently done via database scripts)
+### P0 - Critique
+- Aucun (fonctionnalités critiques terminées)
 
-### P2 - Medium Priority
-- Minor accessibility fix: Add aria-describedby to DialogContent components
+### P1 - Important
+- [ ] Refactoring `server.py` (>4600 lignes) en modules séparés
+- [ ] Améliorer robustesse sync blockchain automatique
+- [ ] Alertes automatiques transactions manquantes
 
-### P3 - Low Priority / Backlog
-1. **Refactoring**
-   - Split `App.js` into separate page components
-   - Split `server.py` into routes/models/services
-   - Organize directory structure
-
-## Completed Features
-
-### Interdependence System (2026-02-07)
-- [x] Crypto ↔ Crypto: Auto-create counterpart transaction for internal transfers
-- [x] Position ↔ Wallet: Auto-create withdrawal when depositing to position
-- [x] Movement → Wallet: Auto-create deposit for realized yield/capital withdrawal
-
-### Auto-Assignment Rules (2026-02-07)
-- [x] Position rules configuration (address + asset matching)
-- [x] Preview matching transactions before applying
-- [x] Auto-create movements (capital_deposit, yield_realized) from matching transactions
-- [x] Link transactions to positions (linked_position_id)
-
-## Database Schema
-
-### Collections
-- `users`: User accounts with hashed passwords
-- `wallets`: Crypto wallet information
-- `transactions`: Crypto transactions (with is_spam flag, linked_crypto_tx_id)
-- `fiat_accounts`: Fiat account balances
-- `fiat_transactions`: Fiat transaction records (with crypto_asset, crypto_amount, linked_crypto_tx_id)
-- `positions`: DeFi/CeFi investment positions
-- `position_movements`: Position earnings/withdrawals
-
-## Key API Endpoints
-- `POST /api/auth/login` - User login
-- `GET/POST /api/fiat-transactions` - Fiat transactions (supports crypto_buy/crypto_sell with crypto_asset, crypto_amount)
-- `PUT/DELETE /api/fiat-transactions/{id}` - Edit/delete fiat tx
-- `PUT /api/transactions/{id}` - Edit crypto transaction
-- `GET/POST /api/positions` - Investment positions
-- `POST /api/positions/{id}/movements` - Add position movement
-- `GET /api/portfolio/pnl` - P&L report (excludes spam)
-- `GET /api/export/fiscal-pdf` - PDF fiscal report
-
-## Last Updated
-2026-02-07 - Implemented Fiat-to-Crypto conversion feature (crypto_buy/crypto_sell)
+### P2 - Nice to have
+- [ ] Dashboard amélioré avec graphiques P&L
+- [ ] Notifications email pour grosses transactions
+- [ ] Support d'autres chaînes (Gnosis, BSC, etc.)
