@@ -997,23 +997,16 @@ async def get_etherscan_status(current_user: dict = Depends(get_current_user)):
 
 @api_router.post("/etherscan/sync-all")
 async def sync_all_wallets(request: Optional[EtherscanSyncRequest] = None, current_user: dict = Depends(get_current_user)):
-    """Sync all wallets for the current user"""
+    """Sync all wallets for the current user. Blockscout networks (Base, Optimism) don't require API key."""
     user_id = current_user["id"]
     
-    # Get API key
+    # Get API key (optional for Blockscout networks)
     api_key = None
     if request and request.api_key:
         api_key = request.api_key
         user_api_keys[user_id] = api_key
     elif user_id in user_api_keys:
         api_key = user_api_keys[user_id]
-    
-    if not api_key:
-        raise HTTPException(
-            status_code=400,
-            detail="API_KEY_REQUIRED",
-            headers={"X-Error-Code": "API_KEY_REQUIRED"}
-        )
     
     # Get all blockchain wallets (not manual)
     wallets = await db.wallets.find({
@@ -1027,11 +1020,21 @@ async def sync_all_wallets(request: Optional[EtherscanSyncRequest] = None, curre
     total_imported = 0
     wallets_synced = 0
     errors = []
+    skipped = []
     
     for wallet in wallets:
         try:
-            # Create a fake request with the API key
-            sync_request = EtherscanSyncRequest(api_key=api_key)
+            network = wallet.get("network", "Ethereum")
+            chain_info = CHAIN_SCANNERS.get(network, {})
+            api_type = chain_info.get("api_type", "etherscan")
+            
+            # Skip Etherscan networks if no API key
+            if api_type != "blockscout" and not api_key:
+                skipped.append(f"{wallet['name']} ({network}): API key required")
+                continue
+            
+            # Create a request with the API key (or None for Blockscout)
+            sync_request = EtherscanSyncRequest(api_key=api_key) if api_key else None
             result = await sync_wallet_from_etherscan(wallet["id"], sync_request, current_user)
             total_imported += result.get("imported_count", 0)
             wallets_synced += 1
@@ -1042,6 +1045,7 @@ async def sync_all_wallets(request: Optional[EtherscanSyncRequest] = None, curre
         "message": f"Synced {wallets_synced} wallets, {total_imported} new transactions",
         "total_imported": total_imported,
         "wallets_synced": wallets_synced,
+        "skipped": skipped if skipped else None,
         "errors": errors if errors else None
     }
 
