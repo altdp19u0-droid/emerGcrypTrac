@@ -790,26 +790,10 @@ async def sync_wallet_from_etherscan(
     request: Optional[EtherscanSyncRequest] = None,
     current_user: dict = Depends(get_current_user)
 ):
-    """Sync transactions from blockchain scanner for a wallet. API key required (from session or request body)"""
+    """Sync transactions from blockchain scanner for a wallet. API key required for Etherscan networks, not for Blockscout."""
     user_id = current_user["id"]
     
-    # Get API key from request body or session
-    api_key = None
-    if request and request.api_key:
-        api_key = request.api_key
-        # Store in session for future use
-        user_api_keys[user_id] = api_key
-    elif user_id in user_api_keys:
-        api_key = user_api_keys[user_id]
-    
-    if not api_key:
-        raise HTTPException(
-            status_code=400, 
-            detail="API_KEY_REQUIRED",
-            headers={"X-Error-Code": "API_KEY_REQUIRED"}
-        )
-    
-    # Get wallet
+    # Get wallet first to check network
     wallet = await db.wallets.find_one({"id": wallet_id, "user_id": user_id}, {"_id": 0})
     if not wallet:
         raise HTTPException(status_code=404, detail="Wallet not found")
@@ -817,14 +801,33 @@ async def sync_wallet_from_etherscan(
     if wallet.get("type") == "manual":
         raise HTTPException(status_code=400, detail="Cannot sync manual wallets")
     
-    address = wallet["address"]
     network = wallet.get("network", "Ethereum")
     
-    # Get chain-specific info
+    # Check if network uses Blockscout (no API key needed)
     if network not in CHAIN_SCANNERS:
         raise HTTPException(status_code=400, detail=f"Network {network} not supported for blockchain sync")
     
     chain_info = CHAIN_SCANNERS[network]
+    api_type = chain_info.get("api_type", "etherscan")
+    
+    # Get API key from request body or session (only needed for etherscan networks)
+    api_key = None
+    if api_type != "blockscout":
+        if request and request.api_key:
+            api_key = request.api_key
+            # Store in session for future use
+            user_api_keys[user_id] = api_key
+        elif user_id in user_api_keys:
+            api_key = user_api_keys[user_id]
+        
+        if not api_key:
+            raise HTTPException(
+                status_code=400, 
+                detail="API_KEY_REQUIRED",
+                headers={"X-Error-Code": "API_KEY_REQUIRED"}
+            )
+    
+    address = wallet["address"]
     chain_id = chain_info["chain_id"]
     scanner_name = chain_info["name"]
     native_symbol = chain_info.get("native_symbol", "ETH")
