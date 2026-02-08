@@ -2493,12 +2493,18 @@ async def get_token_contracts(current_user: dict = Depends(get_current_user)):
 async def set_token_price_for_all(request: dict, current_user: dict = Depends(get_current_user)):
     """
     Set price for all transactions of a specific token.
-    Useful for tokens not found on price APIs.
+    Options:
+    - Single price for all transactions: {"symbol": "TOKEN", "price_eur": 1.0}
+    - Price with date range: {"symbol": "TOKEN", "price_eur": 1.0, "start_date": "2025-01-01", "end_date": "2025-12-31"}
+    - Only update transactions without price: {"symbol": "TOKEN", "price_eur": 1.0, "only_missing": true}
     """
     user_id = current_user["id"]
     symbol = request.get("symbol", "").upper()
     price_eur = request.get("price_eur")
     price_usd = request.get("price_usd")
+    start_date = request.get("start_date")
+    end_date = request.get("end_date")
+    only_missing = request.get("only_missing", True)  # Default: only update missing prices
     
     if not symbol:
         raise HTTPException(status_code=400, detail="symbol is required")
@@ -2512,17 +2518,32 @@ async def set_token_price_for_all(request: dict, current_user: dict = Depends(ge
     elif price_usd is None and price_eur is not None:
         price_usd = price_eur / 0.92
     
-    # Update all transactions for this token
+    # Build query
+    query = {
+        "user_id": user_id,
+        "asset": symbol,
+    }
+    
+    # Date range filter
+    if start_date or end_date:
+        date_filter = {}
+        if start_date:
+            date_filter["$gte"] = start_date
+        if end_date:
+            date_filter["$lte"] = end_date + "T23:59:59"
+        query["date"] = date_filter
+    
+    # Only missing prices filter (default behavior)
+    if only_missing:
+        query["$or"] = [
+            {"price_eur": {"$exists": False}},
+            {"price_eur": None},
+            {"price_eur": 0},
+        ]
+    
+    # Update transactions
     result = await db.transactions.update_many(
-        {
-            "user_id": user_id,
-            "asset": symbol,
-            "$or": [
-                {"price_eur": {"$exists": False}},
-                {"price_eur": None},
-                {"price_eur": 0},
-            ]
-        },
+        query,
         {"$set": {
             "price_eur": price_eur,
             "price_usd": price_usd,
@@ -2534,7 +2555,80 @@ async def set_token_price_for_all(request: dict, current_user: dict = Depends(ge
         "message": f"Prix mis à jour pour {symbol}",
         "updated_count": result.modified_count,
         "price_eur": price_eur,
-        "price_usd": price_usd
+        "price_usd": price_usd,
+        "date_range": f"{start_date or '*'} → {end_date or '*'}",
+        "only_missing": only_missing
+    }
+
+@api_router.post("/transactions/set-price-by-date")
+async def set_token_price_by_date(request: dict, current_user: dict = Depends(get_current_user)):
+    """
+    Set different prices for a token based on date ranges.
+    Example: {"symbol": "8LNDS", "prices": [
+        {"start_date": "2025-01-01", "end_date": "2025-06-30", "price_eur": 0.008},
+        {"start_date": "2025-07-01", "end_date": "2025-12-31", "price_eur": 0.012}
+    ]}
+    """
+    user_id = current_user["id"]
+    symbol = request.get("symbol", "").upper()
+    prices = request.get("prices", [])
+    
+    if not symbol:
+        raise HTTPException(status_code=400, detail="symbol is required")
+    
+    if not prices:
+        raise HTTPException(status_code=400, detail="prices array is required")
+    
+    total_updated = 0
+    results = []
+    
+    for price_range in prices:
+        start_date = price_range.get("start_date")
+        end_date = price_range.get("end_date")
+        price_eur = price_range.get("price_eur")
+        price_usd = price_range.get("price_usd")
+        
+        if price_eur is None and price_usd is None:
+            continue
+            
+        if price_eur is None:
+            price_eur = price_usd * 0.92
+        elif price_usd is None:
+            price_usd = price_eur / 0.92
+        
+        query = {
+            "user_id": user_id,
+            "asset": symbol,
+        }
+        
+        if start_date or end_date:
+            date_filter = {}
+            if start_date:
+                date_filter["$gte"] = start_date
+            if end_date:
+                date_filter["$lte"] = end_date + "T23:59:59"
+            query["date"] = date_filter
+        
+        result = await db.transactions.update_many(
+            query,
+            {"$set": {
+                "price_eur": price_eur,
+                "price_usd": price_usd,
+                "price_source": "manual_dated"
+            }}
+        )
+        
+        total_updated += result.modified_count
+        results.append({
+            "date_range": f"{start_date or '*'} → {end_date or '*'}",
+            "price_eur": price_eur,
+            "updated": result.modified_count
+        })
+    
+    return {
+        "message": f"Prix mis à jour pour {symbol}",
+        "total_updated": total_updated,
+        "details": results
     }
 
 @api_router.get("/transactions/tokens-without-prices")
