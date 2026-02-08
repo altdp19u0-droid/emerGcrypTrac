@@ -1631,6 +1631,11 @@ const TransactionsPage = () => {
             Récupérer Fees
           </Button>
           
+          <Button variant="outline" onClick={handleCreateDoubleEntries} data-testid="create-double-entries-btn" title="Créer les écritures miroir pour les transferts entre vos wallets">
+            <ArrowLeftRight size={16} className="mr-2" />
+            Double-Entry
+          </Button>
+          
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button data-testid="add-transaction-btn">
