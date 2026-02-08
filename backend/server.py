@@ -4478,19 +4478,23 @@ async def get_pnl_report(current_user: dict = Depends(get_current_user)):
             internal_transfer = is_internal_transfer(tx)
             
             if tx_type in ["Transfer In", "Buy"]:
+                # Amount should be positive for buys
+                abs_amount = abs(amount)
                 # Add to FIFO queue
-                cost_per_unit = price_eur + (fee_eur / amount if amount > 0 else 0)
-                fifo_queue.append({"amount": amount, "cost": cost_per_unit})
-                total_bought += amount
-                total_cost_eur += amount * price_eur + fee_eur
+                cost_per_unit = price_eur + (fee_eur / abs_amount if abs_amount > 0 else 0)
+                fifo_queue.append({"amount": abs_amount, "cost": cost_per_unit})
+                total_bought += abs_amount
+                total_cost_eur += abs_amount * price_eur + fee_eur
                 
             elif tx_type in ["Transfer Out", "Sell"]:
-                total_sold += amount
-                proceeds = amount * price_eur - fee_eur
+                # Amount is negative for sells, use absolute value
+                abs_amount = abs(amount)
+                total_sold += abs_amount
+                proceeds = abs_amount * price_eur - fee_eur
                 total_proceeds_eur += proceeds
                 
                 # Calculate cost basis using FIFO
-                remaining = amount
+                remaining = abs_amount
                 cost_basis = 0
                 
                 while remaining > 0 and fifo_queue:
