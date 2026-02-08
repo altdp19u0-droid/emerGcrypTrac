@@ -2347,6 +2347,7 @@ async def verify_wallet_transactions(wallet_id: str, current_user: dict = Depend
     """
     Compare transactions in database vs blockchain for a wallet.
     Returns missing transactions that exist on blockchain but not in DB.
+    Supports all networks: Ethereum, Polygon, Arbitrum (via Etherscan V2), Base, Optimism (via Blockscout).
     """
     import aiohttp
     
@@ -2363,20 +2364,23 @@ async def verify_wallet_transactions(wallet_id: str, current_user: dict = Depend
     if not address:
         raise HTTPException(status_code=400, detail="Wallet has no address")
     
-    # Only support Blockscout networks for now (Base, Optimism)
-    blockscout_url = BLOCKSCOUT_APIS.get(network)
-    if not blockscout_url:
+    # Check if network is supported
+    chain_info = CHAIN_SCANNERS.get(network)
+    if not chain_info:
         return {
-            "message": f"Vérification non supportée pour le réseau {network}. Seuls Base et Optimism sont supportés.",
+            "message": f"Vérification non supportée pour le réseau {network}.",
             "supported": False,
             "missing_transactions": []
         }
+    
+    api_type = chain_info.get("api_type", "etherscan")
+    native_symbol = chain_info.get("native_symbol", "ETH")
     
     # Get existing transaction hashes from DB for this wallet
     db_transactions = await db.transactions.find(
         {"wallet_id": wallet_id, "user_id": user_id},
         {"tx_hash": 1, "asset": 1, "_id": 0}
-    ).to_list(1000)
+    ).to_list(5000)
     
     # Create a set of (tx_hash, asset) for quick lookup
     db_tx_set = set()
@@ -2387,77 +2391,185 @@ async def verify_wallet_transactions(wallet_id: str, current_user: dict = Depend
     missing_transactions = []
     
     async with aiohttp.ClientSession() as session:
-        # 1. Check native transactions
-        url = f"{blockscout_url}/addresses/{address}/transactions"
-        try:
-            async with session.get(url, timeout=30) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    for tx in data.get("items", []):
-                        tx_hash = tx.get("hash", "").lower()
-                        value = int(tx.get("value", "0"))
-                        value_eth = value / (10 ** 18)
-                        
-                        if value_eth > 0:
-                            native_symbol = CHAIN_SCANNERS.get(network, {}).get("native_symbol", "ETH")
-                            if (tx_hash, native_symbol.upper()) not in db_tx_set:
+        if api_type == "blockscout":
+            # Use Blockscout API (Base, Optimism)
+            blockscout_url = BLOCKSCOUT_APIS.get(network)
+            if not blockscout_url:
+                return {
+                    "message": f"URL Blockscout non configurée pour {network}.",
+                    "supported": False,
+                    "missing_transactions": []
+                }
+            
+            # 1. Check native transactions
+            url = f"{blockscout_url}/addresses/{address}/transactions"
+            try:
+                async with session.get(url, timeout=30) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        for tx in data.get("items", []):
+                            tx_hash = tx.get("hash", "").lower()
+                            value = int(tx.get("value", "0"))
+                            value_eth = value / (10 ** 18)
+                            
+                            if value_eth > 0:
+                                if (tx_hash, native_symbol.upper()) not in db_tx_set:
+                                    from_addr = (tx.get("from", {}) or {}).get("hash", "")
+                                    to_addr = (tx.get("to", {}) or {}).get("hash", "")
+                                    is_incoming = to_addr.lower() == address.lower()
+                                    
+                                    missing_transactions.append({
+                                        "tx_hash": tx_hash,
+                                        "token_symbol": native_symbol,
+                                        "value": f"{value_eth:.6f}",
+                                        "direction": "IN" if is_incoming else "OUT",
+                                        "timestamp": tx.get("timestamp", ""),
+                                        "from": from_addr,
+                                        "to": to_addr
+                                    })
+            except Exception as e:
+                logger.error(f"Error fetching Blockscout native transactions: {e}")
+            
+            # 2. Check token transfers
+            url = f"{blockscout_url}/addresses/{address}/token-transfers"
+            params = {"type": "ERC-20"}
+            try:
+                async with session.get(url, params=params, timeout=30) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        for tx in data.get("items", []):
+                            tx_hash = tx.get("transaction_hash", "").lower()
+                            token = tx.get("token", {}) or {}
+                            symbol = (token.get("symbol", "") or "UNKNOWN").upper()
+                            decimals = int(token.get("decimals") or 18)
+                            
+                            total = tx.get("total", {}) or {}
+                            value_raw = total.get("value", "0")
+                            amount = float(value_raw) / (10 ** decimals) if value_raw else 0
+                            
+                            if tx_hash and (tx_hash, symbol) not in db_tx_set:
                                 from_addr = (tx.get("from", {}) or {}).get("hash", "")
                                 to_addr = (tx.get("to", {}) or {}).get("hash", "")
                                 is_incoming = to_addr.lower() == address.lower()
                                 
                                 missing_transactions.append({
                                     "tx_hash": tx_hash,
-                                    "asset": native_symbol,
-                                    "amount": value_eth if is_incoming else -value_eth,
-                                    "type": "Transfer In" if is_incoming else "Transfer Out",
-                                    "date": tx.get("timestamp", ""),
+                                    "token_symbol": symbol,
+                                    "value": f"{amount:.6f}",
+                                    "direction": "IN" if is_incoming else "OUT",
+                                    "timestamp": tx.get("timestamp", ""),
                                     "from": from_addr,
-                                    "to": to_addr,
-                                    "reason": "Transaction native non importée"
+                                    "to": to_addr
                                 })
-        except Exception as e:
-            logger.error(f"Error fetching native transactions: {e}")
+            except Exception as e:
+                logger.error(f"Error fetching Blockscout token transfers: {e}")
         
-        # 2. Check token transfers
-        url = f"{blockscout_url}/addresses/{address}/token-transfers"
-        params = {"type": "ERC-20"}
-        try:
-            async with session.get(url, params=params, timeout=30) as response:
-                if response.status == 200:
-                    data = await response.json()
-                    for tx in data.get("items", []):
-                        tx_hash = tx.get("transaction_hash", "").lower()
-                        token = tx.get("token", {}) or {}
-                        symbol = (token.get("symbol", "") or "UNKNOWN").upper()
-                        decimals = int(token.get("decimals") or 18)
-                        
-                        total = tx.get("total", {}) or {}
-                        value_raw = total.get("value", "0")
-                        amount = float(value_raw) / (10 ** decimals) if value_raw else 0
-                        
-                        if tx_hash and (tx_hash, symbol) not in db_tx_set:
-                            from_addr = (tx.get("from", {}) or {}).get("hash", "")
-                            to_addr = (tx.get("to", {}) or {}).get("hash", "")
-                            is_incoming = to_addr.lower() == address.lower()
-                            
-                            missing_transactions.append({
-                                "tx_hash": tx_hash,
-                                "asset": symbol,
-                                "amount": amount if is_incoming else -amount,
-                                "type": "Transfer In" if is_incoming else "Transfer Out",
-                                "date": tx.get("timestamp", ""),
-                                "from": from_addr,
-                                "to": to_addr,
-                                "reason": "Token transfer non importé"
-                            })
-        except Exception as e:
-            logger.error(f"Error fetching token transfers: {e}")
+        else:
+            # Use Etherscan V2 API (Ethereum, Polygon, Arbitrum)
+            # Check if user has API key
+            api_key = await db.user_settings.find_one(
+                {"user_id": user_id, "key": "etherscan_api_key"},
+                {"_id": 0}
+            )
+            
+            if not api_key or not api_key.get("value"):
+                return {
+                    "message": f"Clé API Etherscan requise pour vérifier les transactions sur {network}. Configurez-la en synchronisant un wallet.",
+                    "supported": False,
+                    "requires_api_key": True,
+                    "missing_transactions": []
+                }
+            
+            etherscan_key = api_key["value"]
+            chain_id = chain_info.get("chain_id", 1)
+            
+            # 1. Check normal transactions
+            try:
+                params = {
+                    "chainid": chain_id,
+                    "module": "account",
+                    "action": "txlist",
+                    "address": address,
+                    "startblock": 0,
+                    "endblock": 99999999,
+                    "sort": "desc",
+                    "apikey": etherscan_key
+                }
+                async with session.get(ETHERSCAN_V2_API, params=params, timeout=30) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if data.get("status") == "1":
+                            for tx in data.get("result", [])[:200]:  # Limit to 200
+                                tx_hash = tx.get("hash", "").lower()
+                                value = int(tx.get("value", "0"))
+                                value_eth = value / (10 ** 18)
+                                
+                                if value_eth > 0:
+                                    if (tx_hash, native_symbol.upper()) not in db_tx_set:
+                                        from_addr = tx.get("from", "")
+                                        to_addr = tx.get("to", "")
+                                        is_incoming = to_addr.lower() == address.lower()
+                                        timestamp = int(tx.get("timeStamp", 0))
+                                        
+                                        missing_transactions.append({
+                                            "tx_hash": tx_hash,
+                                            "token_symbol": native_symbol,
+                                            "value": f"{value_eth:.6f}",
+                                            "direction": "IN" if is_incoming else "OUT",
+                                            "timestamp": timestamp,
+                                            "from": from_addr,
+                                            "to": to_addr
+                                        })
+            except Exception as e:
+                logger.error(f"Error fetching Etherscan normal transactions: {e}")
+            
+            # 2. Check ERC-20 token transfers
+            try:
+                params = {
+                    "chainid": chain_id,
+                    "module": "account",
+                    "action": "tokentx",
+                    "address": address,
+                    "startblock": 0,
+                    "endblock": 99999999,
+                    "sort": "desc",
+                    "apikey": etherscan_key
+                }
+                async with session.get(ETHERSCAN_V2_API, params=params, timeout=30) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        if data.get("status") == "1":
+                            for tx in data.get("result", [])[:500]:  # Limit to 500
+                                tx_hash = tx.get("hash", "").lower()
+                                symbol = (tx.get("tokenSymbol", "") or "UNKNOWN").upper()
+                                decimals = int(tx.get("tokenDecimal") or 18)
+                                value_raw = tx.get("value", "0")
+                                amount = float(value_raw) / (10 ** decimals) if value_raw else 0
+                                
+                                if tx_hash and (tx_hash, symbol) not in db_tx_set:
+                                    from_addr = tx.get("from", "")
+                                    to_addr = tx.get("to", "")
+                                    is_incoming = to_addr.lower() == address.lower()
+                                    timestamp = int(tx.get("timeStamp", 0))
+                                    
+                                    missing_transactions.append({
+                                        "tx_hash": tx_hash,
+                                        "token_symbol": symbol,
+                                        "value": f"{amount:.6f}",
+                                        "direction": "IN" if is_incoming else "OUT",
+                                        "timestamp": timestamp,
+                                        "from": from_addr,
+                                        "to": to_addr
+                                    })
+            except Exception as e:
+                logger.error(f"Error fetching Etherscan token transfers: {e}")
     
     return {
         "message": f"{len(missing_transactions)} transaction(s) manquante(s) détectée(s)",
         "supported": True,
         "wallet_name": wallet.get("name"),
         "network": network,
+        "api_type": api_type,
         "db_transaction_count": len(db_transactions),
         "missing_count": len(missing_transactions),
         "missing_transactions": missing_transactions[:50]  # Limit to 50 for response size
