@@ -1456,6 +1456,22 @@ const TransactionsPage = () => {
     }
   };
 
+  // Create missing double-entries for internal transfers
+  const handleCreateDoubleEntries = async () => {
+    try {
+      toast.info("Création des double-entries en cours...");
+      const response = await api.post("/transactions/create-double-entries");
+      if (response.data.created_count > 0) {
+        toast.success(response.data.message);
+        fetchTransactions();
+      } else {
+        toast.info(response.data.message);
+      }
+    } catch (error) {
+      toast.error("Erreur lors de la création des double-entries");
+    }
+  };
+
   const toggleSpam = async (txId) => {
     try {
       const response = await api.patch(`/transactions/${txId}/spam`);
