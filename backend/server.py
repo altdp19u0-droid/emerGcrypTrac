@@ -2287,6 +2287,204 @@ async def preview_spam_detection(current_user: dict = Depends(get_current_user))
         "safe_count": len(safe_tokens)
     }
 
+# ==================== MISSING PRICES RECOVERY ====================
+
+@api_router.get("/transactions/missing-prices")
+async def get_transactions_missing_prices(current_user: dict = Depends(get_current_user)):
+    """Get all transactions that are missing price data"""
+    user_id = current_user["id"]
+    
+    # Find transactions where price is 0, null, or doesn't exist
+    transactions = await db.transactions.find({
+        "user_id": user_id,
+        "$or": [
+            {"price_eur": {"$exists": False}},
+            {"price_eur": None},
+            {"price_eur": 0},
+            {"price_usd": {"$exists": False}},
+            {"price_usd": None},
+            {"price_usd": 0},
+        ],
+        "is_spam": {"$ne": True}
+    }, {"_id": 0}).to_list(10000)
+    
+    # Group by asset
+    by_asset = {}
+    for tx in transactions:
+        asset = tx.get("asset", "UNKNOWN")
+        if asset not in by_asset:
+            by_asset[asset] = {"count": 0, "total_amount": 0}
+        by_asset[asset]["count"] += 1
+        by_asset[asset]["total_amount"] += abs(tx.get("amount", 0))
+    
+    return {
+        "total_missing": len(transactions),
+        "by_asset": [
+            {"asset": k, "count": v["count"], "total_amount": v["total_amount"]}
+            for k, v in sorted(by_asset.items(), key=lambda x: x[1]["count"], reverse=True)
+        ]
+    }
+
+@api_router.post("/transactions/fetch-missing-prices")
+async def fetch_missing_prices(current_user: dict = Depends(get_current_user)):
+    """Fetch and update prices for all transactions missing price data"""
+    from datetime import datetime
+    
+    user_id = current_user["id"]
+    
+    # Find transactions where price is missing or 0
+    transactions = await db.transactions.find({
+        "user_id": user_id,
+        "$or": [
+            {"price_eur": {"$exists": False}},
+            {"price_eur": None},
+            {"price_eur": 0},
+            {"price_usd": {"$exists": False}},
+            {"price_usd": None},
+            {"price_usd": 0},
+        ],
+        "is_spam": {"$ne": True}
+    }).to_list(10000)
+    
+    updated_count = 0
+    failed_assets = set()
+    updated_assets = set()
+    
+    # Get wallets for chain info
+    wallets = await db.wallets.find({"user_id": user_id}, {"_id": 0}).to_list(1000)
+    wallet_chains = {w["id"]: w.get("network", "Ethereum") for w in wallets}
+    
+    for tx in transactions:
+        asset = tx.get("asset", "")
+        wallet_id = tx.get("wallet_id", "")
+        chain = wallet_chains.get(wallet_id, "Ethereum")
+        
+        # Get timestamp from date
+        date_str = tx.get("date", "")
+        try:
+            if date_str:
+                dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                timestamp = int(dt.timestamp())
+            else:
+                timestamp = int(datetime.now().timestamp())
+        except:
+            timestamp = int(datetime.now().timestamp())
+        
+        # Try to get historical price
+        price_data = await get_historical_token_price(asset, chain, timestamp)
+        
+        if price_data and price_data.get("price_usd", 0) > 0:
+            await db.transactions.update_one(
+                {"_id": tx["_id"]},
+                {"$set": {
+                    "price_usd": price_data["price_usd"],
+                    "price_eur": price_data["price_eur"],
+                    "price_source": price_data.get("source", "defillama")
+                }}
+            )
+            updated_count += 1
+            updated_assets.add(asset)
+        else:
+            failed_assets.add(asset)
+    
+    return {
+        "message": f"{updated_count} transaction(s) mise(s) à jour avec les prix",
+        "updated_count": updated_count,
+        "updated_assets": list(updated_assets),
+        "failed_assets": list(failed_assets),
+        "total_processed": len(transactions)
+    }
+
+@api_router.post("/transactions/fetch-price/{tx_id}")
+async def fetch_single_transaction_price(tx_id: str, current_user: dict = Depends(get_current_user)):
+    """Fetch and update price for a single transaction"""
+    from datetime import datetime
+    
+    user_id = current_user["id"]
+    
+    tx = await db.transactions.find_one({"id": tx_id, "user_id": user_id})
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    asset = tx.get("asset", "")
+    wallet_id = tx.get("wallet_id", "")
+    
+    # Get chain from wallet
+    wallet = await db.wallets.find_one({"id": wallet_id, "user_id": user_id})
+    chain = wallet.get("network", "Ethereum") if wallet else "Ethereum"
+    
+    # Get timestamp
+    date_str = tx.get("date", "")
+    try:
+        dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+        timestamp = int(dt.timestamp())
+    except:
+        timestamp = int(datetime.now().timestamp())
+    
+    # Fetch price
+    price_data = await get_historical_token_price(asset, chain, timestamp)
+    
+    if price_data and price_data.get("price_usd", 0) > 0:
+        await db.transactions.update_one(
+            {"_id": tx["_id"]},
+            {"$set": {
+                "price_usd": price_data["price_usd"],
+                "price_eur": price_data["price_eur"],
+                "price_source": price_data.get("source", "defillama")
+            }}
+        )
+        return {
+            "message": f"Prix mis à jour pour {asset}",
+            "price_usd": price_data["price_usd"],
+            "price_eur": price_data["price_eur"],
+            "source": price_data.get("source")
+        }
+    else:
+        raise HTTPException(
+            status_code=404, 
+            detail=f"Prix non trouvé pour {asset} sur {chain}. Vérifiez que l'adresse du contrat est configurée."
+        )
+
+@api_router.post("/token-contracts")
+async def add_token_contract(request: dict, current_user: dict = Depends(get_current_user)):
+    """Add or update a token contract address for price lookups"""
+    symbol = request.get("symbol", "").upper()
+    chain = request.get("chain", "").lower()
+    contract = request.get("contract", "").lower()
+    
+    if not symbol or not chain or not contract:
+        raise HTTPException(status_code=400, detail="symbol, chain, and contract are required")
+    
+    # Store in database for persistence
+    await db.token_contracts.update_one(
+        {"symbol": symbol, "chain": chain},
+        {"$set": {"symbol": symbol, "chain": chain, "contract": contract}},
+        upsert=True
+    )
+    
+    # Also update in-memory dict
+    if symbol not in TOKEN_CONTRACTS:
+        TOKEN_CONTRACTS[symbol] = {}
+    TOKEN_CONTRACTS[symbol][chain] = contract
+    
+    return {"message": f"Contract ajouté: {symbol} sur {chain}", "contract": contract}
+
+@api_router.get("/token-contracts")
+async def get_token_contracts(current_user: dict = Depends(get_current_user)):
+    """Get all configured token contracts"""
+    # Get from database
+    db_contracts = await db.token_contracts.find({}, {"_id": 0}).to_list(1000)
+    
+    # Merge with default contracts
+    all_contracts = dict(TOKEN_CONTRACTS)
+    for c in db_contracts:
+        symbol = c["symbol"]
+        if symbol not in all_contracts:
+            all_contracts[symbol] = {}
+        all_contracts[symbol][c["chain"]] = c["contract"]
+    
+    return {"contracts": all_contracts}
+
 # ==================== TRANSACTION CRUD ====================
 
 @api_router.post("/transactions", response_model=dict)
