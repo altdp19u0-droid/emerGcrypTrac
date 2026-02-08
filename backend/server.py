@@ -2676,6 +2676,14 @@ async def get_tokens_without_prices(current_user: dict = Depends(get_current_use
                     {"price_eur": {"$exists": False}},
                     {"price_eur": None},
                     {"price_eur": 0},
+                ],
+                # Exclude locked prices (they have a price, just showing for info)
+                "$and": [
+                    {"$or": [
+                        {"price_locked": {"$exists": False}},
+                        {"price_locked": False},
+                        {"price_locked": None}
+                    ]}
                 ]
             }
         },
@@ -2704,6 +2712,190 @@ async def get_tokens_without_prices(current_user: dict = Depends(get_current_use
             }
             for t in tokens
         ]
+    }
+
+@api_router.post("/transactions/verify-and-fetch-prices")
+async def verify_and_fetch_prices(current_user: dict = Depends(get_current_user)):
+    """
+    Procédure de vérification et recherche des prix manquants:
+    1. Identifie toutes les transactions sans prix (non verrouillées)
+    2. Tente de récupérer les prix automatiquement via DeFiLlama
+    3. Retourne un rapport avec:
+       - Transactions mises à jour automatiquement
+       - Transactions nécessitant une saisie manuelle
+    """
+    from datetime import datetime
+    
+    user_id = current_user["id"]
+    
+    # Get wallets for chain info
+    wallets = await db.wallets.find({"user_id": user_id}, {"_id": 0}).to_list(1000)
+    wallet_chains = {w["id"]: w.get("network", "Ethereum") for w in wallets}
+    
+    # Find transactions without prices (excluding locked ones)
+    transactions = await db.transactions.find({
+        "user_id": user_id,
+        "is_spam": {"$ne": True},
+        "$or": [
+            {"price_eur": {"$exists": False}},
+            {"price_eur": None},
+            {"price_eur": 0},
+        ],
+        "$and": [
+            {"$or": [
+                {"price_locked": {"$exists": False}},
+                {"price_locked": False}
+            ]}
+        ]
+    }).to_list(10000)
+    
+    if not transactions:
+        return {
+            "message": "Aucune transaction sans prix trouvée",
+            "auto_updated": 0,
+            "manual_required": [],
+            "total_checked": 0
+        }
+    
+    auto_updated = 0
+    auto_updated_assets = set()
+    manual_required = {}  # {asset: [tx_ids]}
+    
+    for tx in transactions:
+        asset = tx.get("asset", "")
+        wallet_id = tx.get("wallet_id", "")
+        chain = wallet_chains.get(wallet_id, "Ethereum")
+        tx_id = tx.get("id", str(tx.get("_id", "")))
+        
+        # Get timestamp from date
+        date_str = tx.get("date", "")
+        try:
+            if date_str:
+                dt = datetime.fromisoformat(date_str.replace("Z", "+00:00"))
+                timestamp = int(dt.timestamp())
+            else:
+                timestamp = int(datetime.now().timestamp())
+        except:
+            timestamp = int(datetime.now().timestamp())
+        
+        # Try to get historical price
+        price_data = await get_historical_token_price(asset, chain, timestamp)
+        
+        if price_data and price_data.get("price_usd", 0) > 0:
+            # Auto-update
+            await db.transactions.update_one(
+                {"_id": tx["_id"]},
+                {"$set": {
+                    "price_usd": price_data["price_usd"],
+                    "price_eur": price_data["price_eur"],
+                    "price_source": price_data.get("source", "defillama"),
+                    "price_locked": True  # Lock auto-fetched prices
+                }}
+            )
+            auto_updated += 1
+            auto_updated_assets.add(asset)
+        else:
+            # Add to manual required list
+            if asset not in manual_required:
+                manual_required[asset] = {
+                    "count": 0,
+                    "total_amount": 0,
+                    "first_date": date_str,
+                    "last_date": date_str,
+                    "sample_tx_ids": []
+                }
+            manual_required[asset]["count"] += 1
+            manual_required[asset]["total_amount"] += abs(tx.get("amount", 0))
+            if date_str < manual_required[asset]["first_date"]:
+                manual_required[asset]["first_date"] = date_str
+            if date_str > manual_required[asset]["last_date"]:
+                manual_required[asset]["last_date"] = date_str
+            if len(manual_required[asset]["sample_tx_ids"]) < 5:
+                manual_required[asset]["sample_tx_ids"].append(tx_id)
+    
+    # Format manual required list
+    manual_list = [
+        {
+            "symbol": asset,
+            "transactions_count": data["count"],
+            "total_amount": data["total_amount"],
+            "first_date": data["first_date"],
+            "last_date": data["last_date"],
+            "sample_tx_ids": data["sample_tx_ids"],
+            "requires_manual_price": True
+        }
+        for asset, data in sorted(manual_required.items(), key=lambda x: x[1]["count"], reverse=True)
+    ]
+    
+    return {
+        "message": f"Vérification terminée. {auto_updated} tx mises à jour automatiquement, {len(manual_list)} token(s) nécessitent une saisie manuelle.",
+        "auto_updated": auto_updated,
+        "auto_updated_assets": list(auto_updated_assets),
+        "manual_required": manual_list,
+        "total_checked": len(transactions),
+        "warning": "Les tokens ci-dessous n'ont pas de prix disponible automatiquement. Veuillez saisir le prix manuellement." if manual_list else None
+    }
+
+@api_router.get("/transactions/price-status")
+async def get_price_status(current_user: dict = Depends(get_current_user)):
+    """
+    Get overall status of prices for all transactions.
+    Returns counts of: locked, manual, missing, total
+    """
+    user_id = current_user["id"]
+    
+    # Count by price status
+    pipeline = [
+        {"$match": {"user_id": user_id, "is_spam": {"$ne": True}}},
+        {
+            "$group": {
+                "_id": {
+                    "has_price": {"$cond": [{"$and": [
+                        {"$ne": ["$price_eur", None]},
+                        {"$ne": ["$price_eur", 0]},
+                        {"$gt": ["$price_eur", 0]}
+                    ]}, True, False]},
+                    "is_locked": {"$ifNull": ["$price_locked", False]},
+                    "source": {"$ifNull": ["$price_source", "unknown"]}
+                },
+                "count": {"$sum": 1}
+            }
+        }
+    ]
+    
+    results = await db.transactions.aggregate(pipeline).to_list(100)
+    
+    # Parse results
+    total = 0
+    with_price = 0
+    locked = 0
+    manual = 0
+    missing = 0
+    auto_fetched = 0
+    
+    for r in results:
+        count = r["count"]
+        total += count
+        
+        if r["_id"]["has_price"]:
+            with_price += count
+            if r["_id"]["is_locked"]:
+                locked += count
+            if r["_id"]["source"] == "manual":
+                manual += count
+            elif r["_id"]["source"] in ["defillama", "defillama_historical", "defillama_current", "coingecko"]:
+                auto_fetched += count
+        else:
+            missing += count
+    
+    return {
+        "total_transactions": total,
+        "with_price": with_price,
+        "missing_price": missing,
+        "locked_prices": locked,
+        "manual_prices": manual,
+        "auto_fetched_prices": auto_fetched,
+        "price_coverage": f"{(with_price / total * 100):.1f}%" if total > 0 else "0%"
     }
 
 # ==================== TRANSACTION CRUD ====================
