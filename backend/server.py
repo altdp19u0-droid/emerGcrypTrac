@@ -2492,11 +2492,13 @@ async def get_token_contracts(current_user: dict = Depends(get_current_user)):
 @api_router.post("/transactions/set-token-price")
 async def set_token_price_for_all(request: dict, current_user: dict = Depends(get_current_user)):
     """
-    Set price for all transactions of a specific token.
+    Set price for transactions of a specific token.
+    IMPORTANT: Transactions with price_locked=true (imported from blockchain) cannot be modified.
+    
     Options:
     - Single price for all transactions: {"symbol": "TOKEN", "price_eur": 1.0}
     - Price with date range: {"symbol": "TOKEN", "price_eur": 1.0, "start_date": "2025-01-01", "end_date": "2025-12-31"}
-    - Only update transactions without price: {"symbol": "TOKEN", "price_eur": 1.0, "only_missing": true}
+    - Force update locked prices: {"symbol": "TOKEN", "price_eur": 1.0, "force": true} (use with caution)
     """
     user_id = current_user["id"]
     symbol = request.get("symbol", "")  # Keep original case
@@ -2504,7 +2506,7 @@ async def set_token_price_for_all(request: dict, current_user: dict = Depends(ge
     price_usd = request.get("price_usd")
     start_date = request.get("start_date")
     end_date = request.get("end_date")
-    only_missing = request.get("only_missing", True)  # Default: only update missing prices
+    force = request.get("force", False)  # Force update even locked prices
     
     if not symbol:
         raise HTTPException(status_code=400, detail="symbol is required")
@@ -2518,37 +2520,56 @@ async def set_token_price_for_all(request: dict, current_user: dict = Depends(ge
     elif price_usd is None and price_eur is not None:
         price_usd = price_eur / 0.92
     
-    # Build query - try both original case and uppercase
-    base_query = {
+    # Build query - match both original case and uppercase
+    base_conditions = [
+        {"asset": symbol}, 
+        {"asset": symbol.upper()},
+        {"asset": symbol.lower()}
+    ]
+    
+    # Base query
+    query = {
         "user_id": user_id,
-        "$or": [{"asset": symbol}, {"asset": symbol.upper()}]
+        "$or": base_conditions
     }
     
     # Date range filter
-    date_filter = {}
-    if start_date:
-        date_filter["$gte"] = start_date
-    if end_date:
-        date_filter["$lte"] = end_date + "T23:59:59"
+    if start_date or end_date:
+        date_filter = {}
+        if start_date:
+            date_filter["$gte"] = start_date
+        if end_date:
+            date_filter["$lte"] = end_date + "T23:59:59"
+        query["date"] = date_filter
     
-    if date_filter:
-        base_query["date"] = date_filter
-    
-    # Only missing prices filter (default behavior)
-    if only_missing:
-        base_query["$and"] = [
-            {"$or": [{"asset": symbol}, {"asset": symbol.upper()}]},
+    # Exclude locked prices unless force=true
+    if not force:
+        query["$and"] = [
+            {"$or": base_conditions},
+            {"$or": [
+                {"price_locked": {"$exists": False}},
+                {"price_locked": False},
+                {"price_locked": None}
+            ]},
             {"$or": [
                 {"price_eur": {"$exists": False}},
                 {"price_eur": None},
                 {"price_eur": 0},
             ]}
         ]
-        del base_query["$or"]
+        del query["$or"]
+    
+    # Count locked transactions that won't be updated
+    locked_query = {
+        "user_id": user_id,
+        "$or": base_conditions,
+        "price_locked": True
+    }
+    locked_count = await db.transactions.count_documents(locked_query)
     
     # Update transactions
     result = await db.transactions.update_many(
-        base_query,
+        query,
         {"$set": {
             "price_eur": price_eur,
             "price_usd": price_usd,
@@ -2556,14 +2577,19 @@ async def set_token_price_for_all(request: dict, current_user: dict = Depends(ge
         }}
     )
     
-    return {
+    response = {
         "message": f"Prix mis à jour pour {symbol}",
         "updated_count": result.modified_count,
         "price_eur": price_eur,
         "price_usd": price_usd,
-        "date_range": f"{start_date or '*'} → {end_date or '*'}",
-        "only_missing": only_missing
+        "date_range": f"{start_date or '*'} → {end_date or '*'}"
     }
+    
+    if locked_count > 0 and not force:
+        response["locked_count"] = locked_count
+        response["warning"] = f"{locked_count} transaction(s) avec prix verrouillé (importé blockchain) non modifiée(s)"
+    
+    return response
 
 @api_router.post("/transactions/set-price-by-date")
 async def set_token_price_by_date(request: dict, current_user: dict = Depends(get_current_user)):
