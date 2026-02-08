@@ -793,6 +793,7 @@ const Dashboard = () => {
               </div>
             </div>
             <div className="value-amount">${portfolio.total_value_usd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
+            <div className="value-amount-secondary">€{portfolio.total_value_eur.toLocaleString("fr-FR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</div>
             <div className="value-detail">{filteredAssets.length || 0} assets (spam filtrés)</div>
           </CardContent>
         </Card>
