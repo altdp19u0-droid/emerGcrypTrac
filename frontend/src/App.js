@@ -590,7 +590,7 @@ const Dashboard = () => {
             <DialogTrigger asChild>
               <Button variant="outline" data-testid="manage-hidden-tokens-btn">
                 <Ban size={16} className="mr-2" />
-                Tokens masqués ({hiddenTokens.length})
+                Masqués ({hiddenTokens.length})
               </Button>
             </DialogTrigger>
             <DialogContent>
@@ -638,6 +638,142 @@ const Dashboard = () => {
               </div>
             </DialogContent>
           </Dialog>
+          
+          {/* Spam Tokens Management Dialog */}
+          <Dialog open={spamDialogOpen} onOpenChange={setSpamDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" onClick={openSpamDialog} data-testid="manage-spam-tokens-btn">
+                <AlertTriangle size={16} className="mr-2" />
+                Spam ({spamTokens.length})
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <AlertTriangle size={20} className="text-amber-400" />
+                  Gestion des Tokens Spam
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    Les tokens spam sont automatiquement détectés et exclus du portfolio.
+                  </p>
+                  <Button 
+                    onClick={handleScanSpam} 
+                    disabled={scanningSpam}
+                    variant="outline"
+                    data-testid="scan-spam-btn"
+                  >
+                    {scanningSpam ? (
+                      <><RefreshCw size={16} className="animate-spin mr-2" />Scan...</>
+                    ) : (
+                      <><RefreshCw size={16} className="mr-2" />Scanner</>
+                    )}
+                  </Button>
+                </div>
+                
+                <Tabs defaultValue="spam" className="w-full">
+                  <TabsList className="w-full bg-zinc-800">
+                    <TabsTrigger value="spam" className="flex-1 data-[state=active]:bg-zinc-700">
+                      Spam ({spamTokens.length})
+                    </TabsTrigger>
+                    <TabsTrigger value="preview" className="flex-1 data-[state=active]:bg-zinc-700">
+                      Prévisualisation
+                    </TabsTrigger>
+                  </TabsList>
+                  
+                  <TabsContent value="spam" className="mt-4">
+                    {spamTokens.length > 0 ? (
+                      <ScrollArea className="h-[300px]">
+                        <div className="space-y-2">
+                          {spamTokens.map((token) => (
+                            <div key={token.symbol} className="flex items-center justify-between p-3 bg-zinc-800 rounded-md">
+                              <div className="flex-1 min-w-0">
+                                <span className="font-mono text-sm text-red-400 truncate block">{token.symbol}</span>
+                                <span className="text-xs text-muted-foreground">
+                                  {token.transaction_count} transaction(s)
+                                </span>
+                              </div>
+                              <Button 
+                                variant="ghost" 
+                                size="sm" 
+                                onClick={() => handleUnmarkSpam(token.symbol)}
+                                className="text-green-400 hover:text-green-300 hover:bg-green-500/10 ml-2"
+                                title="Retirer du spam"
+                              >
+                                <Check size={14} />
+                              </Button>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    ) : (
+                      <p className="text-center text-muted-foreground py-8">Aucun token spam détecté</p>
+                    )}
+                  </TabsContent>
+                  
+                  <TabsContent value="preview" className="mt-4">
+                    <div className="space-y-4">
+                      <div>
+                        <h4 className="text-sm font-medium text-amber-400 mb-2">
+                          Seraient marqués comme spam ({spamPreview.would_be_marked_spam?.length || 0})
+                        </h4>
+                        <ScrollArea className="h-[120px]">
+                          <div className="space-y-1">
+                            {spamPreview.would_be_marked_spam?.map((token) => (
+                              <div key={token.symbol} className="flex items-center justify-between p-2 bg-red-900/20 rounded text-sm">
+                                <span className="font-mono truncate text-red-300">{token.symbol}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xs text-muted-foreground">
+                                    Pattern: {token.matched_pattern}
+                                  </span>
+                                  {!token.currently_marked_spam && (
+                                    <Button 
+                                      variant="ghost" 
+                                      size="sm"
+                                      onClick={() => handleMarkAsSpam(token.symbol)}
+                                      className="h-6 px-2 text-red-400 hover:bg-red-500/10"
+                                    >
+                                      Marquer
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </div>
+                      
+                      <div>
+                        <h4 className="text-sm font-medium text-green-400 mb-2">
+                          Tokens légitimes ({spamPreview.safe_tokens?.length || 0})
+                        </h4>
+                        <ScrollArea className="h-[120px]">
+                          <div className="space-y-1">
+                            {spamPreview.safe_tokens?.map((token) => (
+                              <div key={token.symbol} className="flex items-center justify-between p-2 bg-green-900/20 rounded text-sm">
+                                <span className="font-mono text-green-300">{token.symbol}</span>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm"
+                                  onClick={() => handleMarkAsSpam(token.symbol)}
+                                  className="h-6 px-2 text-amber-400 hover:bg-amber-500/10"
+                                >
+                                  Marquer spam
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                        </ScrollArea>
+                      </div>
+                    </div>
+                  </TabsContent>
+                </Tabs>
+              </div>
+            </DialogContent>
+          </Dialog>
+          
           <Button onClick={fetchData} variant="outline" data-testid="refresh-btn">
             <RefreshCw size={16} className="mr-2" />
             Refresh
