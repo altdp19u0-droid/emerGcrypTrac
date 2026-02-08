@@ -1873,7 +1873,7 @@ async def fetch_missing_fees(current_user: dict = Depends(get_current_user)):
     # Find transactions with tx_hash but no fees
     transactions = await db.transactions.find({
         "user_id": current_user["id"],
-        "tx_hash": {"$ne": None, "$ne": ""},
+        "tx_hash": {"$exists": True, "$ne": None, "$nin": ["", None]},
         "$or": [{"fees": 0}, {"fees": {"$exists": False}}, {"fees": None}]
     }, {"_id": 0}).to_list(500)
     
