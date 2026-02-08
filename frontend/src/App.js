@@ -1938,9 +1938,18 @@ const TransactionsPage = () => {
     }
   };
 
+  const fetchPriceStatus = async () => {
+    try {
+      const response = await api.get("/transactions/price-status");
+      setPriceStatus(response.data);
+    } catch (error) {
+      console.error("Error fetching price status:", error);
+    }
+  };
+
   const openPricesDialog = async () => {
     setPricesDialogOpen(true);
-    await fetchTokensWithoutPrices();
+    await Promise.all([fetchTokensWithoutPrices(), fetchPriceStatus()]);
   };
 
   const handleFetchAllMissingPrices = async () => {
