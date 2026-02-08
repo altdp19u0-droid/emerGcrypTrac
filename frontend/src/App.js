@@ -1291,10 +1291,30 @@ const TransactionsPage = () => {
     }
   };
 
+  // Check if address is a user's wallet
+  const isUserWallet = (address) => {
+    if (!address) return false;
+    const addrLower = address.toLowerCase();
+    return wallets.some(w => w.address && w.address.toLowerCase() === addrLower);
+  };
+
   const getAddressColor = (address) => {
     if (!address) return "neutral";
+    
+    // First check if it's user's own wallet - always trusted
+    if (isUserWallet(address)) return "trusted";
+    
+    // Then check classifications
     const classification = addressClassifications[address.toLowerCase()];
     return classification || "neutral";
+  };
+
+  // Get wallet name for an address if it's user's wallet
+  const getWalletNameForAddress = (address) => {
+    if (!address) return null;
+    const addrLower = address.toLowerCase();
+    const wallet = wallets.find(w => w.address && w.address.toLowerCase() === addrLower);
+    return wallet ? wallet.name : null;
   };
 
   useEffect(() => {
