@@ -1945,17 +1945,23 @@ const TransactionsPage = () => {
   const handleFetchAllMissingPrices = async () => {
     setFetchingPrices(true);
     try {
-      toast.info("Récupération automatique des prix...");
-      const response = await api.post("/transactions/fetch-missing-prices");
-      if (response.data.updated_count > 0) {
-        toast.success(response.data.message);
-      } else {
+      toast.info("Vérification et recherche des prix...");
+      const response = await api.post("/transactions/verify-and-fetch-prices");
+      
+      if (response.data.auto_updated > 0) {
+        toast.success(`${response.data.auto_updated} transaction(s) mise(s) à jour automatiquement`);
+      }
+      
+      if (response.data.manual_required && response.data.manual_required.length > 0) {
+        toast.warning(`${response.data.manual_required.length} token(s) nécessitent une saisie manuelle du prix`);
+      } else if (response.data.auto_updated === 0) {
         toast.info("Aucun prix trouvé automatiquement. Utilisez la saisie manuelle.");
       }
+      
       fetchTokensWithoutPrices();
       fetchTransactions();
     } catch (error) {
-      toast.error("Erreur lors de la récupération des prix");
+      toast.error("Erreur lors de la vérification des prix");
     } finally {
       setFetchingPrices(false);
     }
