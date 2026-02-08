@@ -1610,6 +1610,11 @@ const TransactionsPage = () => {
             Export CSV
           </Button>
           
+          <Button variant="outline" onClick={handleFetchMissingFees} data-testid="fetch-fees-btn" title="Récupérer les frais de gas manquants depuis la blockchain">
+            <RefreshCw size={16} className="mr-2" />
+            Récupérer Fees
+          </Button>
+          
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button data-testid="add-transaction-btn">
