@@ -5485,40 +5485,29 @@ async def get_defi_positions(current_user: dict = Depends(get_current_user)):
     """
     user_id = current_user["id"]
     
-    # Aggregate transactions by DeFi protocol
-    pipeline = [
-        {
-            "$match": {
-                "user_id": user_id,
-                "is_spam": {"$ne": True},
-                "defi_protocol": {"$exists": True, "$ne": None}
-            }
-        },
-        {
-            "$group": {
-                "_id": {
-                    "protocol": "$defi_protocol",
-                    "asset": "$asset",
-                    "category": "$income_category"
-                },
-                "total_amount": {"$sum": "$amount"},
-                "total_value_eur": {"$sum": {"$multiply": [{"$abs": "$amount"}, {"$ifNull": ["$price_eur", 0]}]}},
-                "count": {"$sum": 1},
-                "first_date": {"$min": "$date"},
-                "last_date": {"$max": "$date"}
-            }
-        },
-        {"$sort": {"_id.protocol": 1, "_id.asset": 1}}
-    ]
-    
-    results = await db.transactions.aggregate(pipeline).to_list(1000)
+    # Get all DeFi-linked transactions
+    transactions = await db.transactions.find({
+        "user_id": user_id,
+        "is_spam": {"$ne": True},
+        "defi_protocol": {"$exists": True, "$ne": None}
+    }, {"_id": 0}).to_list(10000)
     
     # Organize by protocol
     positions = {}
-    for r in results:
-        protocol = r["_id"]["protocol"]
-        asset = r["_id"]["asset"]
-        category = r["_id"]["category"]
+    
+    for tx in transactions:
+        protocol = tx.get("defi_protocol")
+        if not protocol:
+            continue
+            
+        asset = tx.get("asset", "UNKNOWN")
+        amount = abs(tx.get("amount", 0))
+        price_eur = tx.get("price_eur", 0)
+        value_eur = amount * price_eur
+        income_cat = tx.get("income_category", "")
+        expense_cat = tx.get("expense_category", "")
+        tx_type = tx.get("type", "")
+        date = tx.get("date", "")
         
         if protocol not in positions:
             positions[protocol] = {
@@ -5533,30 +5522,36 @@ async def get_defi_positions(current_user: dict = Depends(get_current_user)):
         
         if asset not in positions[protocol]["assets"]:
             positions[protocol]["assets"][asset] = {
-                "deposits": 0,
-                "withdrawals": 0,
-                "rewards": 0,
+                "deposits": 0, "withdrawals": 0, "rewards": 0,
+                "deposits_eur": 0, "withdrawals_eur": 0, "rewards_eur": 0,
                 "net_position": 0
             }
         
-        amount = r["total_amount"]
-        value_eur = r["total_value_eur"]
-        
-        if category in ["yield", "interest"]:
-            positions[protocol]["assets"][asset]["rewards"] += abs(amount)
+        # Categorize based on income/expense category or transaction type
+        if income_cat in ["yield", "interest"]:
+            positions[protocol]["assets"][asset]["rewards"] += amount
+            positions[protocol]["assets"][asset]["rewards_eur"] += value_eur
             positions[protocol]["total_rewards_eur"] += value_eur
-        elif category == "capital_return":
-            positions[protocol]["assets"][asset]["withdrawals"] += abs(amount)
+        elif income_cat == "capital_return":
+            positions[protocol]["assets"][asset]["withdrawals"] += amount
+            positions[protocol]["assets"][asset]["withdrawals_eur"] += value_eur
             positions[protocol]["total_withdrawals_eur"] += value_eur
-        elif amount > 0:
-            positions[protocol]["assets"][asset]["deposits"] += abs(amount)
+        elif expense_cat == "investment" or tx_type == "Transfer Out":
+            positions[protocol]["assets"][asset]["deposits"] += amount
+            positions[protocol]["assets"][asset]["deposits_eur"] += value_eur
             positions[protocol]["total_deposits_eur"] += value_eur
+        elif tx_type == "Transfer In":
+            # Default incoming as reward if not categorized
+            positions[protocol]["assets"][asset]["rewards"] += amount
+            positions[protocol]["assets"][asset]["rewards_eur"] += value_eur
+            positions[protocol]["total_rewards_eur"] += value_eur
         
         # Track dates
-        if positions[protocol]["first_activity"] is None or r["first_date"] < positions[protocol]["first_activity"]:
-            positions[protocol]["first_activity"] = r["first_date"]
-        if positions[protocol]["last_activity"] is None or r["last_date"] > positions[protocol]["last_activity"]:
-            positions[protocol]["last_activity"] = r["last_date"]
+        if date:
+            if positions[protocol]["first_activity"] is None or date < positions[protocol]["first_activity"]:
+                positions[protocol]["first_activity"] = date
+            if positions[protocol]["last_activity"] is None or date > positions[protocol]["last_activity"]:
+                positions[protocol]["last_activity"] = date
     
     # Calculate net positions
     for protocol, data in positions.items():
