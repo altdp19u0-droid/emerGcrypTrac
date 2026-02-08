@@ -50,9 +50,14 @@ Application de suivi de portefeuille crypto/fiat pour le calcul des impôts. Foc
 
 ### 2025-02-08
 - ✅ Terminé: Fonctionnalité "Vérification des Transactions Manquantes"
-  - Bouton "Vérifier" sur chaque wallet
-  - Dialog avec liste des transactions manquantes
-  - Checkboxes + import sélectif
+  - Bouton "Vérifier" (icône œil) sur chaque wallet blockchain
+  - Dialog avec liste des transactions manquantes + checkboxes
+  - Import sélectif des transactions
+  - **Support de TOUS les réseaux** :
+    - Base, Optimism via Blockscout (gratuit)
+    - Ethereum, Polygon, Arbitrum via Etherscan V2 (clé API requise)
+  - Message clair quand clé API manquante
+  - Lien explorer dynamique selon le réseau
   - Endpoints: `GET /wallets/{id}/verify-transactions`, `POST /wallets/{id}/import-missing`
 
 ### Précédemment implémenté
