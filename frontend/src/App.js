@@ -5709,6 +5709,357 @@ const ReportsPage = () => {
   );
 };
 
+// ==================== DEFI PAGE ====================
+
+const DeFiPage = () => {
+  const { accessToken } = useAuth();
+  const [positions, setPositions] = useState({});
+  const [selectedProtocol, setSelectedProtocol] = useState(null);
+  const [protocolDetail, setProtocolDetail] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [categorizing, setCategorizing] = useState(false);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+
+  const api = createAuthenticatedApi(accessToken);
+
+  const fetchPositions = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get("/defi/positions");
+      setPositions(response.data.positions || {});
+    } catch (error) {
+      console.error("Error fetching DeFi positions:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleAutoCategorize = async () => {
+    setCategorizing(true);
+    try {
+      toast.info("Catégorisation automatique en cours...");
+      const response = await api.post("/defi/auto-categorize");
+      toast.success(response.data.message);
+      fetchPositions();
+    } catch (error) {
+      toast.error("Erreur lors de la catégorisation");
+    } finally {
+      setCategorizing(false);
+    }
+  };
+
+  const openProtocolDetail = async (protocolKey) => {
+    setSelectedProtocol(protocolKey);
+    setDetailDialogOpen(true);
+    try {
+      const response = await api.get(`/defi/position/${protocolKey}`);
+      setProtocolDetail(response.data);
+    } catch (error) {
+      toast.error("Erreur lors du chargement des détails");
+    }
+  };
+
+  useEffect(() => {
+    fetchPositions();
+  }, []);
+
+  const COLORS = ["#3B82F6", "#10B981", "#F59E0B", "#EF4444", "#8B5CF6"];
+
+  // Calculate totals
+  const totalDeposits = Object.values(positions).reduce((sum, p) => sum + (p.total_deposits_eur || 0), 0);
+  const totalRewards = Object.values(positions).reduce((sum, p) => sum + (p.total_rewards_eur || 0), 0);
+  const totalWithdrawals = Object.values(positions).reduce((sum, p) => sum + (p.total_withdrawals_eur || 0), 0);
+  const overallROI = totalDeposits > 0 ? (totalRewards / totalDeposits) * 100 : 0;
+
+  return (
+    <div className="page-container" data-testid="defi-page">
+      <div className="page-content">
+        {/* Header */}
+        <div className="page-header">
+          <div>
+            <h1 className="page-title">Positions DeFi</h1>
+            <p className="page-subtitle">Suivez vos investissements DeFi et leurs rendements</p>
+          </div>
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={handleAutoCategorize}
+              disabled={categorizing}
+              data-testid="auto-categorize-btn"
+            >
+              {categorizing ? (
+                <><RefreshCw size={16} className="animate-spin mr-2" />Catégorisation...</>
+              ) : (
+                <><RefreshCw size={16} className="mr-2" />Auto-Catégoriser</>
+              )}
+            </Button>
+            <Button variant="outline" onClick={fetchPositions}>
+              <RefreshCw size={16} className="mr-2" />Actualiser
+            </Button>
+          </div>
+        </div>
+
+        {/* Summary Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+          <Card className="bg-gradient-to-br from-blue-600 to-blue-800">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-blue-200">Total Investi</p>
+                  <p className="text-2xl font-bold text-white">€{totalDeposits.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</p>
+                </div>
+                <DollarSign size={32} className="text-blue-300" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-br from-green-600 to-green-800">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-green-200">Total Rewards</p>
+                  <p className="text-2xl font-bold text-white">€{totalRewards.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</p>
+                </div>
+                <TrendingUp size={32} className="text-green-300" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-br from-amber-600 to-amber-800">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-amber-200">Total Retraits</p>
+                  <p className="text-2xl font-bold text-white">€{totalWithdrawals.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</p>
+                </div>
+                <ArrowLeftRight size={32} className="text-amber-300" />
+              </div>
+            </CardContent>
+          </Card>
+          
+          <Card className="bg-gradient-to-br from-purple-600 to-purple-800">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-purple-200">ROI Global</p>
+                  <p className="text-2xl font-bold text-white">{overallROI.toFixed(1)}%</p>
+                </div>
+                <Percent size={32} className="text-purple-300" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Positions List */}
+        {loading ? (
+          <div className="flex justify-center py-12">
+            <RefreshCw size={32} className="animate-spin text-muted-foreground" />
+          </div>
+        ) : Object.keys(positions).length === 0 ? (
+          <Card>
+            <CardContent className="py-12 text-center">
+              <Layers size={48} className="mx-auto text-muted-foreground mb-4" />
+              <p className="text-lg text-muted-foreground">Aucune position DeFi détectée</p>
+              <p className="text-sm text-muted-foreground mt-2">
+                Cliquez sur "Auto-Catégoriser" pour détecter automatiquement vos positions DeFi
+              </p>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {Object.entries(positions).map(([protocolKey, position]) => {
+              const roi = position.total_deposits_eur > 0 
+                ? (position.total_rewards_eur / position.total_deposits_eur) * 100 
+                : 0;
+              
+              // Prepare chart data
+              const chartData = Object.entries(position.assets || {}).map(([asset, data], idx) => ({
+                name: asset,
+                deposits: data.deposits_eur || 0,
+                rewards: data.rewards_eur || 0,
+                fill: COLORS[idx % COLORS.length]
+              }));
+
+              return (
+                <Card key={protocolKey} className="hover:border-blue-500/50 transition-colors cursor-pointer" onClick={() => openProtocolDetail(protocolKey)}>
+                  <CardHeader className="pb-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center">
+                          <Layers size={24} className="text-white" />
+                        </div>
+                        <div>
+                          <CardTitle className="text-lg">{position.name}</CardTitle>
+                          <CardDescription className="flex items-center gap-2">
+                            <Calendar size={12} />
+                            {position.first_activity?.slice(0, 10)} → {position.last_activity?.slice(0, 10)}
+                          </CardDescription>
+                        </div>
+                      </div>
+                      <Badge variant="outline" className={`text-lg px-3 py-1 ${roi >= 0 ? 'text-green-400 border-green-400' : 'text-red-400 border-red-400'}`}>
+                        {roi >= 0 ? '+' : ''}{roi.toFixed(1)}% ROI
+                      </Badge>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="grid grid-cols-3 gap-4 mb-4">
+                      <div className="text-center p-3 bg-zinc-800 rounded-lg">
+                        <p className="text-xs text-muted-foreground">Investi</p>
+                        <p className="text-lg font-semibold text-blue-400">€{position.total_deposits_eur?.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</p>
+                      </div>
+                      <div className="text-center p-3 bg-zinc-800 rounded-lg">
+                        <p className="text-xs text-muted-foreground">Rewards</p>
+                        <p className="text-lg font-semibold text-green-400">€{position.total_rewards_eur?.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</p>
+                      </div>
+                      <div className="text-center p-3 bg-zinc-800 rounded-lg">
+                        <p className="text-xs text-muted-foreground">Retraits</p>
+                        <p className="text-lg font-semibold text-amber-400">€{position.total_withdrawals_eur?.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</p>
+                      </div>
+                    </div>
+                    
+                    {/* Assets breakdown */}
+                    <div className="space-y-2">
+                      <p className="text-xs text-muted-foreground font-medium">Assets</p>
+                      {Object.entries(position.assets || {}).map(([asset, data]) => (
+                        <div key={asset} className="flex items-center justify-between p-2 bg-zinc-900 rounded">
+                          <div className="flex items-center gap-2">
+                            <Badge variant="secondary">{asset}</Badge>
+                          </div>
+                          <div className="text-right text-sm">
+                            <span className="text-green-400">+{data.rewards?.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</span>
+                            <span className="text-muted-foreground mx-1">|</span>
+                            <span className="text-blue-400">Net: {data.net_position?.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                    
+                    <div className="mt-4 text-center">
+                      <Button variant="ghost" size="sm" className="text-blue-400">
+                        <Eye size={14} className="mr-1" /> Voir détails
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Protocol Detail Dialog */}
+        <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+          <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Layers size={24} className="text-blue-400" />
+                {protocolDetail?.summary?.name || selectedProtocol} - Détails
+              </DialogTitle>
+            </DialogHeader>
+            
+            {protocolDetail ? (
+              <div className="space-y-6">
+                {/* Summary Stats */}
+                <div className="grid grid-cols-4 gap-4">
+                  <div className="p-4 bg-zinc-800 rounded-lg text-center">
+                    <p className="text-xs text-muted-foreground">Dépôts</p>
+                    <p className="text-xl font-bold text-blue-400">€{protocolDetail.summary?.total_deposits_eur?.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</p>
+                  </div>
+                  <div className="p-4 bg-zinc-800 rounded-lg text-center">
+                    <p className="text-xs text-muted-foreground">Rewards</p>
+                    <p className="text-xl font-bold text-green-400">€{protocolDetail.summary?.total_rewards_eur?.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</p>
+                  </div>
+                  <div className="p-4 bg-zinc-800 rounded-lg text-center">
+                    <p className="text-xs text-muted-foreground">Retraits</p>
+                    <p className="text-xl font-bold text-amber-400">€{protocolDetail.summary?.total_withdrawals_eur?.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</p>
+                  </div>
+                  <div className="p-4 bg-zinc-800 rounded-lg text-center">
+                    <p className="text-xs text-muted-foreground">ROI</p>
+                    <p className="text-xl font-bold text-purple-400">{protocolDetail.summary?.roi_percent?.toFixed(1)}%</p>
+                  </div>
+                </div>
+
+                {/* By Asset Breakdown */}
+                <div>
+                  <h3 className="text-sm font-medium mb-3">Répartition par Asset</h3>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {Object.entries(protocolDetail.summary?.by_asset || {}).map(([asset, data]) => (
+                      <Card key={asset} className="bg-zinc-800">
+                        <CardContent className="p-4">
+                          <div className="flex items-center justify-between mb-3">
+                            <Badge className="text-lg">{asset}</Badge>
+                          </div>
+                          <div className="grid grid-cols-3 gap-2 text-sm">
+                            <div>
+                              <p className="text-muted-foreground">Dépôts</p>
+                              <p className="font-medium">{data.deposits?.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</p>
+                              <p className="text-xs text-blue-400">€{data.deposits_eur?.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Rewards</p>
+                              <p className="font-medium text-green-400">{data.rewards?.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</p>
+                              <p className="text-xs text-green-400">€{data.rewards_eur?.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</p>
+                            </div>
+                            <div>
+                              <p className="text-muted-foreground">Retraits</p>
+                              <p className="font-medium">{data.withdrawals?.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</p>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Transactions History */}
+                <div>
+                  <h3 className="text-sm font-medium mb-3">Historique des Transactions ({protocolDetail.transactions?.length || 0})</h3>
+                  <ScrollArea className="h-[300px]">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Date</TableHead>
+                          <TableHead>Type</TableHead>
+                          <TableHead>Asset</TableHead>
+                          <TableHead className="text-right">Montant</TableHead>
+                          <TableHead className="text-right">Valeur EUR</TableHead>
+                          <TableHead>Catégorie</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {protocolDetail.transactions?.slice(0, 50).map((tx, idx) => (
+                          <TableRow key={idx}>
+                            <TableCell className="text-sm">{tx.date?.slice(0, 10)}</TableCell>
+                            <TableCell>
+                              <Badge variant={tx.type?.includes("In") ? "default" : "secondary"} className={tx.type?.includes("In") ? "bg-green-600" : "bg-red-600"}>
+                                {tx.type}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>{tx.asset}</TableCell>
+                            <TableCell className="text-right font-mono">{Math.abs(tx.amount)?.toLocaleString('fr-FR', {minimumFractionDigits: 4})}</TableCell>
+                            <TableCell className="text-right">€{(Math.abs(tx.amount) * (tx.price_eur || 0))?.toLocaleString('fr-FR', {minimumFractionDigits: 2})}</TableCell>
+                            <TableCell>
+                              {tx.income_category && <Badge variant="outline" className="text-green-400">{tx.income_category}</Badge>}
+                              {tx.expense_category && <Badge variant="outline" className="text-blue-400">{tx.expense_category}</Badge>}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </ScrollArea>
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-center py-8">
+                <RefreshCw size={32} className="animate-spin text-muted-foreground" />
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      </div>
+    </div>
+  );
+};
+
 // ==================== EXPORT PAGE ====================
 
 const ExportPage = () => {
