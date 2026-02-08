@@ -105,3 +105,5 @@ Application de suivi de portefeuille crypto/fiat pour le calcul des impôts. Foc
 - [ ] Dashboard amélioré avec graphiques P&L
 - [ ] Notifications email pour grosses transactions
 - [ ] Support d'autres chaînes (Gnosis, BSC, etc.)
+- [ ] Récupération automatique des prix historiques journaliers (CoinGecko/DeFiLlama)
+- [ ] Représentation des positions DeFi comme actif virtuel unique sur la page "Positions"
