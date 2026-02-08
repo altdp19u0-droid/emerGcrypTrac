@@ -4453,6 +4453,9 @@ async def get_pnl_report(current_user: dict = Depends(get_current_user)):
     reports = []
     
     for asset, txs in asset_txs.items():
+        # Sort by date for proper FIFO processing
+        txs.sort(key=lambda x: x.get("date", ""))
+        
         # FIFO queue: list of (amount, cost_per_unit_eur)
         fifo_queue = []
         
@@ -4463,9 +4466,13 @@ async def get_pnl_report(current_user: dict = Depends(get_current_user)):
         realized_pnl_eur = 0
         total_fees_eur = 0
         
+        # Simple balance tracking - more reliable than FIFO queue sum
+        simple_balance = 0
+        
         for tx in txs:
             tx_type = tx.get("type", "")
-            amount = abs(tx.get("amount", 0))
+            amount = tx.get("amount", 0)  # Keep original signed value
+            abs_amount = abs(amount)
             price_eur = tx.get("price_eur", 0.92)
             fees = tx.get("fees", 0)
             fees_currency = tx.get("fees_currency", "EUR")
@@ -4478,6 +4485,7 @@ async def get_pnl_report(current_user: dict = Depends(get_current_user)):
             internal_transfer = is_internal_transfer(tx)
             
             if tx_type in ["Transfer In", "Buy"]:
+                simple_balance += abs_amount
                 # Amount should be positive for buys
                 abs_amount = abs(amount)
                 # Add to FIFO queue
