@@ -2489,6 +2489,98 @@ async def get_token_contracts(current_user: dict = Depends(get_current_user)):
     
     return {"contracts": all_contracts}
 
+@api_router.post("/transactions/set-token-price")
+async def set_token_price_for_all(request: dict, current_user: dict = Depends(get_current_user)):
+    """
+    Set price for all transactions of a specific token.
+    Useful for tokens not found on price APIs.
+    """
+    user_id = current_user["id"]
+    symbol = request.get("symbol", "").upper()
+    price_eur = request.get("price_eur")
+    price_usd = request.get("price_usd")
+    
+    if not symbol:
+        raise HTTPException(status_code=400, detail="symbol is required")
+    
+    if price_eur is None and price_usd is None:
+        raise HTTPException(status_code=400, detail="price_eur or price_usd is required")
+    
+    # If only one price provided, calculate the other
+    if price_eur is None and price_usd is not None:
+        price_eur = price_usd * 0.92
+    elif price_usd is None and price_eur is not None:
+        price_usd = price_eur / 0.92
+    
+    # Update all transactions for this token
+    result = await db.transactions.update_many(
+        {
+            "user_id": user_id,
+            "asset": symbol,
+            "$or": [
+                {"price_eur": {"$exists": False}},
+                {"price_eur": None},
+                {"price_eur": 0},
+            ]
+        },
+        {"$set": {
+            "price_eur": price_eur,
+            "price_usd": price_usd,
+            "price_source": "manual"
+        }}
+    )
+    
+    return {
+        "message": f"Prix mis à jour pour {symbol}",
+        "updated_count": result.modified_count,
+        "price_eur": price_eur,
+        "price_usd": price_usd
+    }
+
+@api_router.get("/transactions/tokens-without-prices")
+async def get_tokens_without_prices(current_user: dict = Depends(get_current_user)):
+    """Get list of unique tokens that have transactions without prices"""
+    user_id = current_user["id"]
+    
+    pipeline = [
+        {
+            "$match": {
+                "user_id": user_id,
+                "is_spam": {"$ne": True},
+                "$or": [
+                    {"price_eur": {"$exists": False}},
+                    {"price_eur": None},
+                    {"price_eur": 0},
+                ]
+            }
+        },
+        {
+            "$group": {
+                "_id": "$asset",
+                "count": {"$sum": 1},
+                "total_amount": {"$sum": {"$abs": "$amount"}},
+                "first_date": {"$min": "$date"},
+                "last_date": {"$max": "$date"}
+            }
+        },
+        {"$sort": {"count": -1}}
+    ]
+    
+    tokens = await db.transactions.aggregate(pipeline).to_list(1000)
+    
+    return {
+        "tokens": [
+            {
+                "symbol": t["_id"],
+                "transactions_count": t["count"],
+                "total_amount": t["total_amount"],
+                "first_date": t["first_date"],
+                "last_date": t["last_date"]
+            }
+            for t in tokens
+        ]
+    }
+
 # ==================== TRANSACTION CRUD ====================
 
 @api_router.post("/transactions", response_model=dict)
