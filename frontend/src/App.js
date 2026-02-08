@@ -796,7 +796,11 @@ const WalletsPage = () => {
       const response = await api.get(`/wallets/${wallet.id}/verify-transactions`);
       
       if (!response.data.supported) {
-        toast.warning(response.data.message);
+        if (response.data.requires_api_key) {
+          toast.warning("Clé API Etherscan requise. Synchronisez d'abord ce wallet pour configurer la clé.");
+        } else {
+          toast.warning(response.data.message);
+        }
         setVerifyDialogOpen(false);
         return;
       }
