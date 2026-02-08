@@ -415,7 +415,7 @@ const Sidebar = () => {
 
 const Dashboard = () => {
   const { accessToken } = useAuth();
-  const [portfolio, setPortfolio] = useState({ total_value_usd: 0, assets: [] });
+  const [portfolio, setPortfolio] = useState({ total_value_usd: 0, total_value_eur: 0, assets: [] });
   const [prices, setPrices] = useState({});
   const [chartData, setChartData] = useState([]);
   const [loading, setLoading] = useState(true);
