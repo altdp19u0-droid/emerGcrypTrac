@@ -329,6 +329,61 @@ STABLECOIN_CONTRACTS = STABLECOIN_CONTRACTS_BY_CHAIN["Ethereum"]
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+# ==================== DEFI PROTOCOL ADDRESSES ====================
+# Used for automatic transaction categorization
+
+DEFI_PROTOCOL_ADDRESSES = {
+    "8LENDS": {
+        "name": "8LENDS Lending",
+        "network": "Base",
+        "addresses": {
+            "rewards_contract": "0xd48f1d3eec18d8b71ddf1575bae160030878d705",  # 8LNDS token rewards
+            "lending_pool": "0xf435a133d6cdcb81061f18a4763560f9931db57d",      # USDC lending pool
+        },
+        "categorization_rules": [
+            # (from_address, to_address, asset_pattern, category, income_type)
+            ("0xd48f1d3eec18d8b71ddf1575bae160030878d705", None, "8LNDS", "income", "yield"),  # 8LNDS rewards
+            ("0xf435a133d6cdcb81061f18a4763560f9931db57d", None, "USDC", "income", "interest"),  # USDC interest
+            ("0xf435a133d6cdcb81061f18a4763560f9931db57d", None, None, "withdrawal", None),  # Capital withdrawal
+            (None, "0xf435a133d6cdcb81061f18a4763560f9931db57d", None, "deposit", None),  # Investment/deposit
+        ]
+    }
+}
+
+def normalize_address(addr: str) -> str:
+    """Normalize Ethereum address to lowercase"""
+    return addr.lower() if addr else ""
+
+def categorize_transaction_by_address(tx: dict) -> dict:
+    """
+    Auto-categorize transaction based on known DeFi protocol addresses.
+    Returns dict with suggested category, income_type, and protocol name.
+    """
+    from_addr = normalize_address(tx.get("from_address", "") or tx.get("source_address", ""))
+    to_addr = normalize_address(tx.get("to_address", "") or tx.get("destination_address", ""))
+    asset = tx.get("asset", "").upper()
+    
+    for protocol_key, protocol in DEFI_PROTOCOL_ADDRESSES.items():
+        for rule in protocol.get("categorization_rules", []):
+            rule_from, rule_to, rule_asset, category, income_type = rule
+            
+            # Check if rule matches
+            from_match = rule_from is None or normalize_address(rule_from) == from_addr
+            to_match = rule_to is None or normalize_address(rule_to) == to_addr
+            asset_match = rule_asset is None or rule_asset.upper() == asset
+            
+            # At least one address must match
+            if (rule_from or rule_to) and from_match and to_match and asset_match:
+                return {
+                    "protocol": protocol_key,
+                    "protocol_name": protocol["name"],
+                    "category": category,
+                    "income_type": income_type,
+                    "matched_rule": rule
+                }
+    
+    return None
+
 # ==================== AUTH MODELS ====================
 
 class UserCreate(BaseModel):
