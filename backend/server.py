@@ -1921,6 +1921,103 @@ async def update_transaction_category(tx_id: str, data: IncomeCategoryUpdate, cu
         "income_category": category_value
     }
 
+@api_router.post("/transactions/create-double-entries")
+async def create_missing_double_entries(current_user: dict = Depends(get_current_user)):
+    """Create missing double-entry transactions for transfers between user's own wallets"""
+    user_id = current_user["id"]
+    
+    # Get all user's wallet addresses
+    user_wallets = await db.wallets.find({"user_id": user_id}, {"_id": 0}).to_list(100)
+    wallet_addresses = {w["address"].lower(): w for w in user_wallets}
+    
+    if not wallet_addresses:
+        return {"message": "Aucun wallet trouvé", "created_count": 0}
+    
+    # Find transactions without linked_tx_id that have counterparty matching user's wallets
+    transactions = await db.transactions.find({
+        "user_id": user_id,
+        "linked_tx_id": {"$in": [None, ""]},
+        "counterparty_wallet": {"$exists": True, "$ne": None, "$ne": ""}
+    }, {"_id": 0}).to_list(1000)
+    
+    created_count = 0
+    already_exists = 0
+    
+    for tx in transactions:
+        counterparty = tx.get("counterparty_wallet", "").lower()
+        
+        # Check if counterparty is one of user's wallets
+        if counterparty in wallet_addresses:
+            counterparty_wallet = wallet_addresses[counterparty]
+            
+            # Check if mirror transaction already exists
+            mirror_type = "Transfer Out" if tx["type"] == "Transfer In" else "Transfer In"
+            mirror_existing = await db.transactions.find_one({
+                "tx_hash": tx.get("tx_hash"),
+                "user_id": user_id,
+                "wallet_id": counterparty_wallet["id"],
+                "asset": tx.get("asset")
+            })
+            
+            if mirror_existing:
+                # Link them if not already linked
+                if not tx.get("linked_tx_id"):
+                    await db.transactions.update_one(
+                        {"id": tx["id"]},
+                        {"$set": {"linked_tx_id": mirror_existing["id"]}}
+                    )
+                if not mirror_existing.get("linked_tx_id"):
+                    await db.transactions.update_one(
+                        {"id": mirror_existing["id"]},
+                        {"$set": {"linked_tx_id": tx["id"]}}
+                    )
+                already_exists += 1
+                continue
+            
+            # Create mirror transaction
+            mirror_amount = -tx.get("amount", 0)  # Opposite sign
+            
+            mirror_tx = Transaction(
+                user_id=user_id,
+                type=mirror_type,
+                asset=tx.get("asset", "UNKNOWN"),
+                amount=mirror_amount,
+                price_usd=tx.get("price_usd", 0),
+                price_eur=tx.get("price_eur", 0),
+                value_usd=abs(mirror_amount) * tx.get("price_usd", 0),
+                value_eur=abs(mirror_amount) * tx.get("price_eur", 0),
+                fees=0,
+                wallet_id=counterparty_wallet["id"],
+                wallet_name=counterparty_wallet["name"],
+                source=tx.get("source", "manual"),
+                date=tx.get("date", datetime.now(timezone.utc).strftime("%Y-%m-%d")),
+                tx_hash=tx.get("tx_hash"),
+                counterparty_wallet=tx.get("wallet_id"),  # Original wallet address
+                linked_tx_id=tx["id"],
+                notes="Double-entry créé automatiquement"
+            )
+            
+            # Get original wallet address for counterparty field
+            original_wallet = await db.wallets.find_one({"id": tx.get("wallet_id")}, {"_id": 0})
+            if original_wallet:
+                mirror_tx.counterparty_wallet = original_wallet.get("address", "")
+            
+            await db.transactions.insert_one(mirror_tx.model_dump())
+            
+            # Update original transaction with link
+            await db.transactions.update_one(
+                {"id": tx["id"]},
+                {"$set": {"linked_tx_id": mirror_tx.id}}
+            )
+            
+            created_count += 1
+    
+    return {
+        "message": f"{created_count} double-entries créées, {already_exists} déjà existantes",
+        "created_count": created_count,
+        "already_linked": already_exists
+    }
+
 @api_router.post("/transactions/fetch-fees")
 async def fetch_missing_fees(current_user: dict = Depends(get_current_user)):
     """Fetch and update fees for transactions that have tx_hash but fees=0"""
