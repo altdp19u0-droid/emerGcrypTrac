@@ -1437,6 +1437,25 @@ const TransactionsPage = () => {
     }
   };
 
+  // Fetch missing fees from blockchain
+  const handleFetchMissingFees = async () => {
+    try {
+      toast.info("Récupération des frais en cours...");
+      const response = await api.post("/transactions/fetch-fees");
+      if (response.data.updated_count > 0) {
+        toast.success(response.data.message);
+        fetchTransactions();
+      } else {
+        toast.info(response.data.message);
+      }
+      if (response.data.errors && response.data.errors.length > 0) {
+        console.warn("Erreurs lors de la récupération:", response.data.errors);
+      }
+    } catch (error) {
+      toast.error("Erreur lors de la récupération des frais");
+    }
+  };
+
   const toggleSpam = async (txId) => {
     try {
       const response = await api.patch(`/transactions/${txId}/spam`);
