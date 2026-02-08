@@ -712,6 +712,11 @@ const WalletsPage = () => {
   const [pendingSyncWalletId, setPendingSyncWalletId] = useState(null);
   const [etherscanApiKey, setEtherscanApiKey] = useState("");
   const [hasApiKey, setHasApiKey] = useState(false);
+  const [verifyDialogOpen, setVerifyDialogOpen] = useState(false);
+  const [verifyingWallet, setVerifyingWallet] = useState(null);
+  const [missingTransactions, setMissingTransactions] = useState([]);
+  const [selectedMissingTx, setSelectedMissingTx] = useState([]);
+  const [importingMissing, setImportingMissing] = useState(false);
 
   const api = createAuthenticatedApi(accessToken);
 
