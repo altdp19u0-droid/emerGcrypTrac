@@ -5853,6 +5853,7 @@ const MainLayout = () => {
           <Route path="/wallets" element={<WalletsPage />} />
           <Route path="/fiat" element={<FiatPage />} />
           <Route path="/positions" element={<PositionsPage />} />
+          <Route path="/defi" element={<DeFiPage />} />
           <Route path="/transactions" element={<TransactionsPage />} />
           <Route path="/pnl" element={<PnLPage />} />
           <Route path="/reports" element={<ReportsPage />} />
