@@ -4500,6 +4500,7 @@ async def get_pnl_report(current_user: dict = Depends(get_current_user)):
             elif tx_type in ["Transfer Out", "Sell"]:
                 # Amount is negative for sells, use absolute value
                 abs_amount = abs(amount)
+                simple_balance -= abs_amount
                 proceeds = abs_amount * price_eur - fee_eur
                 
                 # Only count in Total Sold if NOT an internal transfer
@@ -4530,13 +4531,14 @@ async def get_pnl_report(current_user: dict = Depends(get_current_user)):
                     realized_pnl_eur += proceeds - cost_basis
                 # For internal transfers, P&L is neutral (0)
         
-        # Calculate current holdings and unrealized P&L
-        current_holdings = sum(lot["amount"] for lot in fifo_queue)
+        # Use simple_balance for current holdings (more reliable than FIFO queue)
+        current_holdings = max(0, simple_balance)
         remaining_cost = sum(lot["amount"] * lot["cost"] for lot in fifo_queue)
         
         price_data = prices.get(asset, {"price_eur": 0.92})
         current_value_eur = current_holdings * price_data.get("price_eur", 0.92)
-        unrealized_pnl_eur = current_value_eur - remaining_cost
+        # Unrealized P&L: only calculate if we have holdings
+        unrealized_pnl_eur = current_value_eur - (remaining_cost * current_holdings / max(sum(lot["amount"] for lot in fifo_queue), 1)) if current_holdings > 0 and fifo_queue else 0
         
         reports.append(PLReport(
             asset=asset,
