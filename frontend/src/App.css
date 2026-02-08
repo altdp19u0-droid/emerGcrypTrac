@@ -410,6 +410,14 @@ label {
   font-weight: 700;
   color: white;
   font-family: 'JetBrains Mono', monospace;
+  margin-bottom: 4px;
+}
+
+.value-amount-secondary {
+  font-size: 22px;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.75);
+  font-family: 'JetBrains Mono', monospace;
   margin-bottom: 8px;
 }
 
