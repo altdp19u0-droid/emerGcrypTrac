@@ -4409,18 +4409,27 @@ async def get_portfolio_allocation(current_user: dict = Depends(get_current_user
 
 @api_router.get("/portfolio/pnl")
 async def get_pnl_report(current_user: dict = Depends(get_current_user)):
-    """Calculate P&L using FIFO method in EUR (excluding SPAM and internal transfers)"""
+    """Calculate P&L using FIFO method in EUR (excluding SPAM, hidden tokens, and internal transfers)"""
+    user_id = current_user["id"]
+    
+    # Get hidden tokens list for this user
+    hidden_tokens_docs = await db.hidden_tokens.find({"user_id": user_id}, {"symbol": 1, "_id": 0}).to_list(1000)
+    hidden_symbols = set(doc["symbol"].upper() for doc in hidden_tokens_docs)
+    
     # Exclude spam transactions from P&L calculations - stricter filter
     transactions = await db.transactions.find(
         {
-            "user_id": current_user["id"],
+            "user_id": user_id,
             "is_spam": {"$ne": True}  # Exclude is_spam=True, include False and undefined
         },
         {"_id": 0}
     ).sort("date", 1).to_list(10000)
     
-    # Filter again in Python to be absolutely sure (belt and suspenders)
-    transactions = [tx for tx in transactions if tx.get("is_spam") != True]
+    # Filter again in Python: exclude spam AND hidden tokens
+    transactions = [
+        tx for tx in transactions 
+        if tx.get("is_spam") != True and tx.get("asset", "").upper() not in hidden_symbols
+    ]
     
     # Identify internal transfers (non-taxable)
     # Internal transfers are: linked_tx_id set, linked_position_id set, or source contains "transfer"
