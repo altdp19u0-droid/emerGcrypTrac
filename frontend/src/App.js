@@ -1492,6 +1492,18 @@ const TransactionsPage = () => {
     }
   };
 
+  // Mark all wallet addresses as trusted
+  const handleMarkWalletsTrusted = async () => {
+    try {
+      toast.info("Marquage des adresses de wallets...");
+      const response = await api.post("/addresses/mark-wallets-trusted");
+      toast.success(response.data.message);
+      fetchAddressClassifications();
+    } catch (error) {
+      toast.error("Erreur lors du marquage");
+    }
+  };
+
   const toggleSpam = async (txId) => {
     try {
       const response = await api.patch(`/transactions/${txId}/spam`);
