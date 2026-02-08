@@ -5358,16 +5358,18 @@ const ReportsPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [pnlRes, txRes, posRes, fiatRes] = await Promise.all([
+        const [pnlRes, txRes, posRes, fiatRes, defiRes] = await Promise.all([
           api.get("/portfolio/pnl"),
           api.get("/transactions", { params: { page_size: 200, hide_spam: true } }),
           api.get("/positions"),
-          api.get("/fiat-accounts")
+          api.get("/fiat-accounts"),
+          api.get("/defi/positions")
         ]);
         setPnlData(pnlRes.data);
         setTransactions(txRes.data.transactions || []);
         setPositions(posRes.data.positions || []);
         setFiatAccounts(fiatRes.data || []);
+        setDefiPositions(defiRes.data.positions || {});
       } catch (error) {
         console.error("Error:", error);
       } finally {
