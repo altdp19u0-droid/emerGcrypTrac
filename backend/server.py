@@ -1218,7 +1218,10 @@ async def sync_address_on_chain(request: SyncChainRequest, current_user: dict = 
                         symbol = token.get("symbol", "UNKNOWN") or "UNKNOWN"
                         decimals = int(token.get("decimals") or 18)
                         
+                        logger.info(f"Processing token transfer: {tx_hash[:20]}... | {symbol}")
+                        
                         if not tx_hash or not symbol:
+                            logger.info(f"  Skipping: no tx_hash or symbol")
                             continue
                         
                         existing = await db.transactions.find_one({
@@ -1227,6 +1230,9 @@ async def sync_address_on_chain(request: SyncChainRequest, current_user: dict = 
                             "asset": symbol,
                             "source": f"blockchain_{network.lower()}"
                         })
+                        
+                        if existing:
+                            logger.info(f"  Skipping: already exists")
                         
                         if not existing:
                             to_addr = tx.get("to", {}) or {}
