@@ -344,6 +344,7 @@ const Sidebar = () => {
     { path: "/wallets", icon: Wallet, label: "Wallets" },
     { path: "/fiat", icon: DollarSign, label: "Fiat" },
     { path: "/positions", icon: PiggyBank, label: "Positions" },
+    { path: "/defi", icon: Layers, label: "DeFi" },
     { path: "/transactions", icon: ArrowLeftRight, label: "Transactions" },
     { path: "/pnl", icon: Calculator, label: "P&L" },
     { path: "/reports", icon: FileText, label: "Rapports" },
