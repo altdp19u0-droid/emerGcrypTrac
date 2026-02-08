@@ -2178,21 +2178,45 @@ const TransactionsPage = () => {
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
+                {/* Price Status Summary */}
+                {priceStatus && (
+                  <div className="grid grid-cols-4 gap-2 p-3 bg-zinc-900 rounded-lg text-center text-xs">
+                    <div>
+                      <div className="text-lg font-bold text-green-400">{priceStatus.with_price}</div>
+                      <div className="text-muted-foreground">Avec prix</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-amber-400">{priceStatus.missing_price}</div>
+                      <div className="text-muted-foreground">Sans prix</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-blue-400">{priceStatus.locked_prices}</div>
+                      <div className="text-muted-foreground">Verrouillés</div>
+                    </div>
+                    <div>
+                      <div className="text-lg font-bold text-purple-400">{priceStatus.price_coverage}</div>
+                      <div className="text-muted-foreground">Couverture</div>
+                    </div>
+                  </div>
+                )}
+                
                 <div className="flex items-center justify-between">
                   <p className="text-sm text-muted-foreground">
-                    {tokensWithoutPrices.length} token(s) sans prix. Définissez le prix en EUR pour calculer correctement le P&L.
+                    {tokensWithoutPrices.length > 0 
+                      ? `${tokensWithoutPrices.length} token(s) sans prix. Les prix verrouillés (blockchain) ne sont pas modifiables.`
+                      : "Tous les tokens ont un prix."}
                   </p>
                   <Button 
                     variant="outline" 
                     size="sm"
                     onClick={handleFetchAllMissingPrices}
                     disabled={fetchingPrices}
-                    title="Tenter de récupérer les prix via DeFiLlama"
+                    title="Vérifier et rechercher les prix automatiquement"
                   >
                     {fetchingPrices ? (
                       <><RefreshCw size={14} className="animate-spin mr-1" />Recherche...</>
                     ) : (
-                      <><RefreshCw size={14} className="mr-1" />Auto-fetch</>
+                      <><RefreshCw size={14} className="mr-1" />Vérifier & Rechercher</>
                     )}
                   </Button>
                 </div>
