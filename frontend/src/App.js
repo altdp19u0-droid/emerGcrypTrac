@@ -2146,6 +2146,94 @@ const TransactionsPage = () => {
             Double-Entry
           </Button>
           
+          {/* Missing Prices Button & Dialog */}
+          <Dialog open={pricesDialogOpen} onOpenChange={setPricesDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="outline" onClick={openPricesDialog} data-testid="missing-prices-btn" title="Gérer les prix manquants pour les tokens">
+                <DollarSign size={16} className="mr-2" />
+                Prix Manquants
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <DollarSign size={20} className="text-amber-400" />
+                  Gestion des Prix Manquants
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm text-muted-foreground">
+                    {tokensWithoutPrices.length} token(s) sans prix. Définissez le prix en EUR pour calculer correctement le P&L.
+                  </p>
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleFetchAllMissingPrices}
+                    disabled={fetchingPrices}
+                    title="Tenter de récupérer les prix via DeFiLlama"
+                  >
+                    {fetchingPrices ? (
+                      <><RefreshCw size={14} className="animate-spin mr-1" />Recherche...</>
+                    ) : (
+                      <><RefreshCw size={14} className="mr-1" />Auto-fetch</>
+                    )}
+                  </Button>
+                </div>
+                
+                {tokensWithoutPrices.length > 0 ? (
+                  <ScrollArea className="h-[350px]">
+                    <div className="space-y-3 pr-4">
+                      {tokensWithoutPrices.map((token) => (
+                        <div key={token.symbol} className="p-3 bg-zinc-800 rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <div>
+                              <span className="font-mono font-medium text-amber-400">{token.symbol}</span>
+                              <span className="text-xs text-muted-foreground ml-2">
+                                {token.transactions_count} tx • {token.total_amount.toFixed(2)} unités
+                              </span>
+                            </div>
+                          </div>
+                          <div className="text-xs text-muted-foreground mb-2">
+                            Période: {token.first_date?.slice(0, 10) || 'N/A'} → {token.last_date?.slice(0, 10) || 'N/A'}
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Input
+                              type="number"
+                              step="0.0001"
+                              placeholder="Prix en EUR (ex: 0.92)"
+                              className="flex-1 h-8"
+                              value={selectedTokenPrice.symbol === token.symbol ? selectedTokenPrice.price_eur : ""}
+                              onChange={(e) => setSelectedTokenPrice({ symbol: token.symbol, price_eur: e.target.value })}
+                              onKeyPress={(e) => e.key === 'Enter' && handleSetTokenPrice(token.symbol)}
+                            />
+                            <Button 
+                              size="sm"
+                              onClick={() => handleSetTokenPrice(token.symbol)}
+                              disabled={selectedTokenPrice.symbol !== token.symbol || !selectedTokenPrice.price_eur}
+                              className="h-8"
+                            >
+                              <Check size={14} className="mr-1" />
+                              Appliquer
+                            </Button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                ) : (
+                  <div className="text-center py-8">
+                    <Check size={48} className="mx-auto text-green-500 mb-4" />
+                    <p className="text-lg font-medium text-green-400">Tous les tokens ont un prix !</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Aucune transaction sans prix détectée.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
+          
           <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
             <DialogTrigger asChild>
               <Button data-testid="add-transaction-btn">
