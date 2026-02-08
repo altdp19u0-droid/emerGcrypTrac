@@ -5393,6 +5393,12 @@ const ReportsPage = () => {
   // Fiat
   const totalFiatBalance = fiatAccounts.reduce((sum, a) => sum + (a.balance || 0), 0);
   
+  // DeFi
+  const totalDefiDeposits = Object.values(defiPositions).reduce((sum, p) => sum + (p.total_deposits_eur || 0), 0);
+  const totalDefiRewards = Object.values(defiPositions).reduce((sum, p) => sum + (p.total_rewards_eur || 0), 0);
+  const totalDefiWithdrawals = Object.values(defiPositions).reduce((sum, p) => sum + (p.total_withdrawals_eur || 0), 0);
+  const defiROI = totalDefiDeposits > 0 ? (totalDefiRewards / totalDefiDeposits) * 100 : 0;
+  
   // Top assets par valeur
   const topAssets = [...(pnlData.reports || [])]
     .sort((a, b) => b.current_value_eur - a.current_value_eur)
