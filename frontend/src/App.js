@@ -1087,6 +1087,118 @@ const WalletsPage = () => {
               </div>
             </DialogContent>
           </Dialog>
+
+          {/* Missing Transactions Verification Dialog */}
+          <Dialog open={verifyDialogOpen} onOpenChange={setVerifyDialogOpen}>
+            <DialogContent className="max-w-2xl">
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                  <AlertTriangle size={20} className="text-amber-400" />
+                  Vérification des transactions - {verifyingWallet?.name}
+                </DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                {missingTransactions.length === 0 ? (
+                  <div className="text-center py-8">
+                    <Check size={48} className="mx-auto text-green-500 mb-4" />
+                    <p className="text-lg font-medium text-green-400">Aucune transaction manquante !</p>
+                    <p className="text-sm text-muted-foreground mt-2">
+                      Toutes les transactions blockchain sont synchronisées.
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    <div className="flex items-center justify-between">
+                      <p className="text-sm text-amber-400">
+                        <AlertTriangle size={14} className="inline mr-1" />
+                        {missingTransactions.length} transaction(s) trouvée(s) sur la blockchain mais absente(s) de votre historique
+                      </p>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={selectAllMissingTx}
+                        data-testid="select-all-missing-btn"
+                      >
+                        {selectedMissingTx.length === missingTransactions.length ? "Désélectionner tout" : "Tout sélectionner"}
+                      </Button>
+                    </div>
+                    
+                    <ScrollArea className="h-[300px] border rounded-md">
+                      <div className="p-2 space-y-2">
+                        {missingTransactions.map((tx) => (
+                          <div 
+                            key={tx.tx_hash} 
+                            className={`flex items-center gap-3 p-3 rounded-md cursor-pointer transition-colors ${
+                              selectedMissingTx.includes(tx.tx_hash) 
+                                ? 'bg-blue-500/20 border border-blue-500/50' 
+                                : 'bg-zinc-800 hover:bg-zinc-700'
+                            }`}
+                            onClick={() => toggleSelectMissingTx(tx.tx_hash)}
+                            data-testid={`missing-tx-${tx.tx_hash.slice(0, 10)}`}
+                          >
+                            <Checkbox 
+                              checked={selectedMissingTx.includes(tx.tx_hash)}
+                              onCheckedChange={() => toggleSelectMissingTx(tx.tx_hash)}
+                            />
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <Badge variant={tx.direction === "IN" ? "default" : "secondary"} className={tx.direction === "IN" ? "bg-green-600" : "bg-red-600"}>
+                                  {tx.direction === "IN" ? "Entrée" : "Sortie"}
+                                </Badge>
+                                <span className="font-mono text-sm">{tx.value} {tx.token_symbol || "ETH"}</span>
+                              </div>
+                              <div className="flex items-center gap-2 mt-1">
+                                <span className="text-xs text-muted-foreground truncate">
+                                  {tx.tx_hash.slice(0, 16)}...{tx.tx_hash.slice(-8)}
+                                </span>
+                                <a 
+                                  href={`https://etherscan.io/tx/${tx.tx_hash}`} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="text-blue-400 hover:text-blue-300"
+                                >
+                                  <ExternalLink size={12} />
+                                </a>
+                              </div>
+                              {tx.timestamp && (
+                                <span className="text-xs text-muted-foreground">
+                                  {new Date(tx.timestamp * 1000).toLocaleString("fr-FR")}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                    
+                    <div className="flex justify-between items-center pt-2 border-t">
+                      <span className="text-sm text-muted-foreground">
+                        {selectedMissingTx.length} transaction(s) sélectionnée(s)
+                      </span>
+                      <Button 
+                        onClick={handleImportSelectedMissing}
+                        disabled={selectedMissingTx.length === 0 || importingMissing}
+                        data-testid="import-missing-btn"
+                      >
+                        {importingMissing ? (
+                          <>
+                            <RefreshCw size={16} className="animate-spin mr-2" />
+                            Import en cours...
+                          </>
+                        ) : (
+                          <>
+                            <Download size={16} className="mr-2" />
+                            Importer ({selectedMissingTx.length})
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </>
+                )}
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
       </div>
 
