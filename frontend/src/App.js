@@ -5350,6 +5350,7 @@ const ReportsPage = () => {
   const [transactions, setTransactions] = useState([]);
   const [positions, setPositions] = useState([]);
   const [fiatAccounts, setFiatAccounts] = useState([]);
+  const [defiPositions, setDefiPositions] = useState({});
   const [loading, setLoading] = useState(true);
 
   const api = createAuthenticatedApi(accessToken);
