@@ -6,7 +6,8 @@ import {
   LayoutDashboard, Wallet, DollarSign, ArrowLeftRight, FileText, Download, 
   Plus, RefreshCw, Trash2, Copy, ChevronLeft, ChevronRight, Upload, LogOut,
   TrendingUp, TrendingDown, User, Lock, Mail, Calculator, Ban, Check,
-  Shield, AlertTriangle, Circle, PanelLeftClose, PanelLeft, Edit2, PiggyBank, Clock, Settings, Eye, ExternalLink
+  Shield, AlertTriangle, Circle, PanelLeftClose, PanelLeft, Edit2, PiggyBank, Clock, Settings, Eye, ExternalLink,
+  Layers, Percent, Calendar, Activity
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
