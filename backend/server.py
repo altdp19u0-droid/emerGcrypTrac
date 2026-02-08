@@ -5264,10 +5264,33 @@ async def get_pnl_report(current_user: dict = Depends(get_current_user)):
         current_holdings = max(0, simple_balance)
         remaining_cost = sum(lot["amount"] * lot["cost"] for lot in fifo_queue)
         
-        price_data = prices.get(asset, {"price_eur": 0.92})
-        current_value_eur = current_holdings * price_data.get("price_eur", 0.92)
-        # Unrealized P&L: only calculate if we have holdings
-        unrealized_pnl_eur = current_value_eur - (remaining_cost * current_holdings / max(sum(lot["amount"] for lot in fifo_queue), 1)) if current_holdings > 0 and fifo_queue else 0
+        # Get current price - prefer live price, fallback to last transaction price
+        price_data = prices.get(asset)
+        if not price_data or price_data.get("price_eur", 0) == 0:
+            # Use average price from FIFO queue (cost basis) as fallback
+            if fifo_queue:
+                avg_cost = remaining_cost / sum(lot["amount"] for lot in fifo_queue) if fifo_queue else 0
+                price_data = {"price_eur": avg_cost, "price_usd": avg_cost / 0.92}
+            else:
+                # Last resort: get last known price from transactions
+                last_tx_with_price = await db.transactions.find_one(
+                    {"user_id": user_id, "asset": asset, "price_eur": {"$gt": 0}},
+                    sort=[("date", -1)]
+                )
+                if last_tx_with_price:
+                    price_data = {
+                        "price_eur": last_tx_with_price.get("price_eur", 0),
+                        "price_usd": last_tx_with_price.get("price_usd", 0)
+                    }
+                else:
+                    price_data = {"price_eur": 0, "price_usd": 0}
+        
+        current_price_eur = price_data.get("price_eur", 0)
+        current_value_eur = current_holdings * current_price_eur
+        
+        # Unrealized P&L: current value minus cost basis
+        cost_basis_total = remaining_cost if fifo_queue else 0
+        unrealized_pnl_eur = current_value_eur - cost_basis_total if current_holdings > 0 else 0
         
         reports.append(PLReport(
             asset=asset,
