@@ -2306,6 +2306,16 @@ const TransactionsPage = () => {
   };
 
   const txTypes = ["Buy", "Sell", "Transfer In", "Transfer Out"];
+  
+  // Types fiscaux avec labels français
+  const fiscalTypes = [
+    { value: "buy", label: "🛒 Achat", description: "Non imposable" },
+    { value: "sell", label: "💰 Vente", description: "Imposable (plus-value)" },
+    { value: "capital_deposit", label: "📥 Dépôt Capital", description: "Non imposable" },
+    { value: "capital_return", label: "📤 Remb. Capital", description: "Non imposable" },
+    { value: "interest", label: "📈 Intérêt", description: "Non imposable si non converti" },
+    { value: "transfer", label: "↔️ Transfert", description: "Non imposable" },
+  ];
 
   return (
     <div className="page-content" data-testid="transactions-page">
