@@ -672,22 +672,36 @@ const Dashboard = () => {
                 </DialogTitle>
               </DialogHeader>
               <div className="space-y-4">
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-2">
                   <p className="text-sm text-muted-foreground">
                     Les tokens spam sont automatiquement détectés et exclus du portfolio.
                   </p>
-                  <Button 
-                    onClick={handleScanSpam} 
-                    disabled={scanningSpam}
-                    variant="outline"
-                    data-testid="scan-spam-btn"
-                  >
-                    {scanningSpam ? (
-                      <><RefreshCw size={16} className="animate-spin mr-2" />Scan...</>
-                    ) : (
-                      <><RefreshCw size={16} className="mr-2" />Scanner</>
-                    )}
-                  </Button>
+                  <div className="flex gap-2">
+                    <Button 
+                      onClick={handleFixFalsePositives}
+                      variant="outline"
+                      size="sm"
+                      className="text-green-400 border-green-500/50 hover:bg-green-900/20"
+                      data-testid="fix-false-positives-btn"
+                      title="Restaurer les tokens légitimes marqués par erreur comme spam"
+                    >
+                      <Check size={16} className="mr-1" />
+                      Réparer
+                    </Button>
+                    <Button 
+                      onClick={handleScanSpam} 
+                      disabled={scanningSpam}
+                      variant="outline"
+                      size="sm"
+                      data-testid="scan-spam-btn"
+                    >
+                      {scanningSpam ? (
+                        <><RefreshCw size={16} className="animate-spin mr-2" />Scan...</>
+                      ) : (
+                        <><RefreshCw size={16} className="mr-2" />Scanner</>
+                      )}
+                    </Button>
+                  </div>
                 </div>
                 
                 <Tabs defaultValue="spam" className="w-full">
