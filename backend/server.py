@@ -5949,7 +5949,13 @@ async def update_transaction_fiscal(
     
     update_fields = {}
     
-    if fiscal_type:
+    # Handle clearing fiscal type (when "Aucun" is selected)
+    if fiscal_type is None or fiscal_type == "":
+        update_fields["fiscal_type"] = None
+        update_fields["fiscal_taxable"] = False
+        update_fields["income_category"] = None
+        update_fields["expense_category"] = None
+    elif fiscal_type:
         update_fields["fiscal_type"] = fiscal_type
         # Auto-set taxable based on type
         update_fields["fiscal_taxable"] = FISCAL_TYPES[fiscal_type]["taxable"]
@@ -5983,8 +5989,9 @@ async def update_transaction_fiscal(
         {"$set": update_fields}
     )
     
+    label = FISCAL_TYPES.get(fiscal_type, {}).get('label', 'Aucun') if fiscal_type else 'Aucun'
     return {
-        "message": f"Transaction mise à jour avec type fiscal: {FISCAL_TYPES.get(fiscal_type, {}).get('label', fiscal_type)}",
+        "message": f"Transaction mise à jour: {label}",
         "fiscal_type": fiscal_type,
         "fiscal_taxable": update_fields.get("fiscal_taxable", False)
     }
