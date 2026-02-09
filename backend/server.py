@@ -114,6 +114,82 @@ COINGECKO_API_URL = "https://api.coingecko.com/api/v3"
 # DeFiLlama API for historical prices
 DEFILLAMA_PRICE_API = "https://coins.llama.fi"
 
+# Cache for EUR/USD exchange rates (date string -> rate)
+EUR_USD_RATE_CACHE = {}
+
+async def get_eur_usd_rate(date_str: str) -> float:
+    """
+    Get historical EUR/USD exchange rate for a specific date.
+    Uses exchangerate.host API (free, no key required).
+    Returns the rate (EUR per 1 USD), e.g., 0.92 means 1 USD = 0.92 EUR.
+    Falls back to 0.92 if API fails.
+    """
+    import aiohttp
+    
+    # Check cache first
+    if date_str in EUR_USD_RATE_CACHE:
+        return EUR_USD_RATE_CACHE[date_str]
+    
+    try:
+        # Use exchangerate.host API (free)
+        url = f"https://api.exchangerate.host/{date_str}?base=USD&symbols=EUR"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=10) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if data.get("success") and "rates" in data and "EUR" in data["rates"]:
+                        rate = data["rates"]["EUR"]
+                        EUR_USD_RATE_CACHE[date_str] = rate
+                        logger.info(f"EUR/USD rate for {date_str}: {rate}")
+                        return rate
+        
+        # Fallback: try frankfurter.app (ECB data, free)
+        url = f"https://api.frankfurter.app/{date_str}?from=USD&to=EUR"
+        async with aiohttp.ClientSession() as session:
+            async with session.get(url, timeout=10) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    if "rates" in data and "EUR" in data["rates"]:
+                        rate = data["rates"]["EUR"]
+                        EUR_USD_RATE_CACHE[date_str] = rate
+                        logger.info(f"EUR/USD rate (frankfurter) for {date_str}: {rate}")
+                        return rate
+                        
+    except Exception as e:
+        logger.warning(f"Failed to fetch EUR/USD rate for {date_str}: {e}")
+    
+    # Default fallback
+    logger.warning(f"Using default EUR/USD rate 0.92 for {date_str}")
+    return 0.92
+
+def get_eur_usd_rate_sync(date_str: str) -> float:
+    """
+    Synchronous version of get_eur_usd_rate for use in sync contexts.
+    """
+    import requests
+    
+    # Check cache first
+    if date_str in EUR_USD_RATE_CACHE:
+        return EUR_USD_RATE_CACHE[date_str]
+    
+    try:
+        # Try frankfurter.app first (ECB data, more reliable)
+        url = f"https://api.frankfurter.app/{date_str}?from=USD&to=EUR"
+        response = requests.get(url, timeout=10)
+        if response.status_code == 200:
+            data = response.json()
+            if "rates" in data and "EUR" in data["rates"]:
+                rate = data["rates"]["EUR"]
+                EUR_USD_RATE_CACHE[date_str] = rate
+                logger.info(f"EUR/USD rate for {date_str}: {rate}")
+                return rate
+                        
+    except Exception as e:
+        logger.warning(f"Failed to fetch EUR/USD rate for {date_str}: {e}")
+    
+    # Default fallback
+    return 0.92
+
 # Token contract addresses by chain (for DeFiLlama price lookups)
 # Format: "SYMBOL": {"chain": "contract_address"}
 TOKEN_CONTRACTS = {
