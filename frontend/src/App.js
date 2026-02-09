@@ -2736,37 +2736,33 @@ const TransactionsPage = () => {
                       {tx.is_spam && <Badge variant="destructive" className="text-xs">SPAM</Badge>}
                     </div>
                   </TableCell>
-                  {/* Libellé (income_category) - seulement pour crypto */}
+                  {/* Libellé (fiscal_type) - seulement pour crypto */}
                   <TableCell>
                     {tx.tx_category === "crypto" ? (
                       <Select 
-                        value={tx.income_category || "none"} 
+                        value={tx.fiscal_type || "none"} 
                         onValueChange={async (value) => {
                           try {
-                            const categoryValue = value === "none" ? null : value;
-                            await api.patch(`/transactions/${tx.id}/category`, { income_category: categoryValue });
-                            toast.success("Catégorie mise à jour");
-                            // Refresh transactions
+                            const fiscalType = value === "none" ? null : value;
+                            await api.put(`/transactions/${tx.id}/fiscal`, { fiscal_type: fiscalType });
+                            toast.success("Type fiscal mis à jour");
                             fetchTransactions();
                           } catch (error) {
                             toast.error("Erreur lors de la mise à jour");
                           }
                         }}
                       >
-                        <SelectTrigger className="h-7 text-xs w-[100px] bg-transparent border-zinc-700">
-                          <SelectValue placeholder="-" />
+                        <SelectTrigger className={`h-7 text-xs w-[120px] border-zinc-700 ${tx.fiscal_taxable ? 'bg-red-900/30 border-red-500/50' : 'bg-transparent'}`}>
+                          <SelectValue placeholder="Catégoriser" />
                         </SelectTrigger>
                         <SelectContent>
                           <SelectItem value="none">Aucun</SelectItem>
-                          <SelectItem value="interest" className="text-green-400">💰 Intérêts</SelectItem>
-                          <SelectItem value="yield" className="text-green-400">📈 Rendement</SelectItem>
-                          <SelectItem value="airdrop" className="text-cyan-400">🎁 Airdrop</SelectItem>
-                          <SelectItem value="reward" className="text-yellow-400">⭐ Récompense</SelectItem>
-                          <SelectItem value="cashback" className="text-purple-400">💸 Cashback</SelectItem>
-                          <SelectItem value="fee" className="text-red-400">💳 Frais</SelectItem>
-                          <SelectItem value="gas" className="text-orange-400">⛽ Gas</SelectItem>
-                          <SelectItem value="subscription" className="text-blue-400">📅 Abonnement</SelectItem>
-                          <SelectItem value="payment" className="text-red-400">💳 Paiement</SelectItem>
+                          <SelectItem value="buy" className="text-blue-400">🛒 Achat</SelectItem>
+                          <SelectItem value="sell" className="text-red-400">💰 Vente (imposable)</SelectItem>
+                          <SelectItem value="capital_deposit" className="text-purple-400">📥 Dépôt Capital</SelectItem>
+                          <SelectItem value="capital_return" className="text-amber-400">📤 Remb. Capital</SelectItem>
+                          <SelectItem value="interest" className="text-green-400">📈 Intérêt</SelectItem>
+                          <SelectItem value="transfer" className="text-zinc-400">↔️ Transfert</SelectItem>
                         </SelectContent>
                       </Select>
                     ) : (
