@@ -2840,15 +2840,16 @@ const TransactionsPage = () => {
               </PopoverContent>
             </Popover>
 
-            {/* Multi-select Types */}
+            {/* Multi-select Types (Opérations) */}
             <Popover>
               <PopoverTrigger asChild>
                 <Button variant="outline" className="w-36 justify-between text-foreground" style={{ backgroundColor: '#27272a' }}>
-                  {filters.tx_types.length === 0 ? "All Types" : `${filters.tx_types.length} type(s)`}
+                  {filters.tx_types.length === 0 ? "Opérations" : `${filters.tx_types.length} op.`}
                   <ChevronLeft size={16} className="rotate-[-90deg]" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-48 p-2" style={{ backgroundColor: '#27272a', color: '#fafafa' }}>
+                <p className="text-xs text-muted-foreground mb-2">Type d'opération technique</p>
                 <div className="space-y-2">
                   {txTypes.map((type) => (
                     <div key={type} className="flex items-center space-x-2">
@@ -2862,6 +2863,49 @@ const TransactionsPage = () => {
                   ))}
                   {filters.tx_types.length > 0 && (
                     <Button variant="ghost" size="sm" className="w-full mt-2" onClick={() => setFilters(prev => ({...prev, tx_types: []}))}>
+                      Réinitialiser
+                    </Button>
+                  )}
+                </div>
+              </PopoverContent>
+            </Popover>
+
+            {/* Multi-select Fiscal Types (Classification Fiscale) */}
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button variant="outline" className="w-36 justify-between text-foreground" style={{ backgroundColor: '#27272a' }}>
+                  {filters.fiscal_types.length === 0 ? "Fiscal" : `${filters.fiscal_types.length} class.`}
+                  <ChevronLeft size={16} className="rotate-[-90deg]" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-56 p-2" style={{ backgroundColor: '#27272a', color: '#fafafa' }}>
+                <p className="text-xs text-muted-foreground mb-2">Classification fiscale</p>
+                <div className="space-y-2">
+                  {fiscalTypes.map((ft) => (
+                    <div key={ft.value} className="flex items-center space-x-2">
+                      <Checkbox 
+                        id={`fiscal-${ft.value}`}
+                        checked={filters.fiscal_types.includes(ft.value)}
+                        onCheckedChange={() => toggleFilter('fiscal_types', ft.value)}
+                      />
+                      <label htmlFor={`fiscal-${ft.value}`} className="text-sm cursor-pointer flex-1">
+                        {ft.label}
+                        <span className="text-xs text-muted-foreground ml-1">({ft.description})</span>
+                      </label>
+                    </div>
+                  ))}
+                  <div className="flex items-center space-x-2 border-t border-zinc-700 pt-2 mt-2">
+                    <Checkbox 
+                      id="fiscal-none"
+                      checked={filters.fiscal_types.includes("none")}
+                      onCheckedChange={() => toggleFilter('fiscal_types', 'none')}
+                    />
+                    <label htmlFor="fiscal-none" className="text-sm cursor-pointer text-zinc-400">
+                      ❓ Non classifié
+                    </label>
+                  </div>
+                  {filters.fiscal_types.length > 0 && (
+                    <Button variant="ghost" size="sm" className="w-full mt-2" onClick={() => setFilters(prev => ({...prev, fiscal_types: []}))}>
                       Réinitialiser
                     </Button>
                   )}
