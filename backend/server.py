@@ -318,26 +318,56 @@ async def get_historical_token_price(symbol: str, chain: str, timestamp: int) ->
 
 # ==================== SPAM DETECTION PATTERNS ====================
 # These patterns are used to automatically detect spam/phishing tokens
+# NOTE: Be careful with patterns - they should not match legitimate tokens
+# Examples of legitimate tokens that should NOT be flagged:
+# - agEUR, stEUR, EURS (contain "eur" but are legitimate)
+# - USDC, USDT (legitimate stablecoins)
 DEFAULT_SPAM_PATTERNS = [
-    # Telegram/social links
-    "t.me", "telegram", "@", 
-    # Phishing keywords
-    "claim", "visit", "airdrop", "reward", "free", "bonus",
-    # Suspicious URLs
-    ".eu", ".live", ".xyz", ".win", ".io/", "http", "www.",
+    # Telegram/social links (with context)
+    "t.me/", "telegram.me", 
+    # Phishing keywords (full URLs or with special chars)
+    ".claim", "/claim", "visit-", "/visit", 
+    "-airdrop", ".airdrop", "/airdrop",
+    "-reward", ".reward", "/reward",
+    "-free", ".free", "/free",
+    "-bonus", ".bonus", "/bonus",
+    # Suspicious URLs (must have protocol or be clearly URLs)
+    "http://", "https://", "www.",
+    ".xyz/", ".win/", ".live/", ".io/claim",
     # Fake stablecoin variants (cyrillic characters, etc.)
     "ꓴꓢꓓ", "UЅDС", "UЅDT",  # Cyrillic lookalikes
-    # Known spam token names
-    "PAWS", "USDWIN", "solshiba",
+    # Known spam token names (full names)
+    "PAWS.t.me", "USDWIN", "solshiba",
     # Special characters often used in spam
-    "⭐", "🎁", "💰", "🔥", "*claim", "*visit",
+    "⭐", "🎁", "💰", "🔥", 
+    "*claim", "*visit", "*free",
     # Bot references
-    "_bot", "Bot_",
+    "_bot", "Bot_", "-bot",
+    # Clear spam patterns
+    "claim.xyz", "airdrop.io", "visit.win",
 ]
+
+# Whitelist of legitimate tokens that should NEVER be marked as spam
+LEGITIMATE_TOKENS = {
+    # EUR-based stablecoins
+    "AGEUR", "STEUR", "EURS", "EURC", "EUROC", "EURT",
+    # USD stablecoins
+    "USDC", "USDT", "BUSD", "TUSD", "GUSD", "USDP", "STUSD", "SUSDC",
+    # Other legitimate tokens
+    "WETH", "WBTC", "STETH", "CBETH", "RETH",
+    "DAI", "SDAI", "FRAX", "LUSD", "MIM",
+    "AAVE", "COMP", "UNI", "LINK", "SNX",
+    "8LNDS", "ZCHF", "AIOZ", "FT",
+}
 
 def is_spam_token(token_symbol: str, custom_patterns: list = None) -> bool:
     """Check if a token symbol matches spam patterns"""
     if not token_symbol:
+        return False
+    
+    # First check whitelist - legitimate tokens are NEVER spam
+    token_upper = token_symbol.upper().strip()
+    if token_upper in LEGITIMATE_TOKENS:
         return False
     
     patterns = custom_patterns or DEFAULT_SPAM_PATTERNS
@@ -348,12 +378,16 @@ def is_spam_token(token_symbol: str, custom_patterns: list = None) -> bool:
             return True
     
     # Additional heuristics
-    # Very long token names are often spam
-    if len(token_symbol) > 50:
+    # Very long token names are often spam (but not too aggressive)
+    if len(token_symbol) > 60:
         return True
     
-    # Tokens starting with $ followed by text (fake USD tokens)
-    if token_symbol.startswith("$") and len(token_symbol) > 5:
+    # Tokens with URLs are spam
+    if "http" in token_lower or "www." in token_lower:
+        return True
+    
+    # Tokens with obvious spam indicators
+    if any(char in token_symbol for char in ["⭐", "🎁", "💰", "🔥", "@"]):
         return True
     
     return False
