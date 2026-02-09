@@ -1584,6 +1584,9 @@ const TransactionsPage = () => {
   const [selectedTokenPrice, setSelectedTokenPrice] = useState({ symbol: "", price_eur: "" });
   const [fetchingPrices, setFetchingPrices] = useState(false);
   
+  // EUR rate fix state
+  const [fixingEurRates, setFixingEurRates] = useState(false);
+  
   // Available assets from transactions
   const [availableAssets, setAvailableAssets] = useState(["USDC", "EURC", "ETH", "MATIC", "EUR", "USD", "CHF"]);
 
