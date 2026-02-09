@@ -3409,6 +3409,21 @@ async def get_transactions(
     elif tx_type and tx_type != "All":
         query["type"] = tx_type
     
+    # Filter by fiscal classification
+    if fiscal_types:
+        fiscal_list = [f.strip() for f in fiscal_types.split(",") if f.strip()]
+        if fiscal_list:
+            fiscal_conditions = []
+            for ft in fiscal_list:
+                if ft == "none":
+                    # Match transactions without fiscal_type
+                    fiscal_conditions.append({"fiscal_type": {"$exists": False}})
+                    fiscal_conditions.append({"fiscal_type": None})
+                else:
+                    fiscal_conditions.append({"fiscal_type": ft})
+            if fiscal_conditions:
+                query["$or"] = fiscal_conditions
+    
     if start_date:
         query["date"] = {"$gte": start_date}
     if end_date:
@@ -3419,7 +3434,14 @@ async def get_transactions(
     
     # Hide spam transactions by default
     if hide_spam:
-        query["$or"] = [{"is_spam": False}, {"is_spam": {"$exists": False}}]
+        # Combine with existing $or if present
+        spam_condition = [{"is_spam": False}, {"is_spam": {"$exists": False}}]
+        if "$or" in query:
+            # Need to use $and to combine
+            existing_or = query.pop("$or")
+            query["$and"] = [{"$or": existing_or}, {"$or": spam_condition}]
+        else:
+            query["$or"] = spam_condition
     
     # Get crypto transactions
     crypto_transactions = await db.transactions.find(query, {"_id": 0}).sort("date", -1).to_list(10000)
