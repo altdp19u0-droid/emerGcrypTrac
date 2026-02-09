@@ -1933,6 +1933,21 @@ const TransactionsPage = () => {
     }
   };
 
+  // Fix EUR prices with historical exchange rates
+  const handleFixEurRates = async () => {
+    setFixingEurRates(true);
+    try {
+      toast.info("Correction des taux EUR/USD en cours (peut prendre quelques secondes)...");
+      const response = await api.post("/transactions/fix-eur-prices");
+      toast.success(response.data.message);
+      fetchTransactions();
+    } catch (error) {
+      toast.error("Erreur lors de la correction des taux EUR");
+    } finally {
+      setFixingEurRates(false);
+    }
+  };
+
   // ==================== Missing Prices Management ====================
   
   const fetchTokensWithoutPrices = async () => {
