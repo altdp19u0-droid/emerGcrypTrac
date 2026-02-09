@@ -2584,6 +2584,79 @@ async def add_to_whitelist(symbol: str, current_user: dict = Depends(get_current
         "transactions_unmarked": result.modified_count
     }
 
+@api_router.delete("/spam-tokens/whitelist/{symbol}")
+async def remove_from_whitelist(symbol: str, current_user: dict = Depends(get_current_user)):
+    """Remove a token from the user's whitelist"""
+    user_id = current_user["id"]
+    symbol_upper = symbol.upper()
+    
+    # Remove from global whitelist (in memory)
+    LEGITIMATE_TOKENS.discard(symbol_upper)
+    
+    # Remove from user's database
+    await db.user_whitelist.update_one(
+        {"user_id": user_id},
+        {"$pull": {"tokens": symbol_upper}}
+    )
+    
+    return {"message": f"Token {symbol_upper} retiré de la whitelist"}
+
+@api_router.get("/spam-tokens/patterns")
+async def get_spam_patterns(current_user: dict = Depends(get_current_user)):
+    """Get the list of spam detection patterns"""
+    user_id = current_user["id"]
+    
+    # Get user's custom patterns
+    user_patterns = await db.user_spam_patterns.find_one({"user_id": user_id})
+    custom_patterns = user_patterns.get("patterns", []) if user_patterns else []
+    
+    return {
+        "default_patterns": DEFAULT_SPAM_PATTERNS,
+        "custom_patterns": custom_patterns,
+        "all_patterns": DEFAULT_SPAM_PATTERNS + custom_patterns
+    }
+
+@api_router.post("/spam-tokens/patterns")
+async def add_spam_pattern(request: dict, current_user: dict = Depends(get_current_user)):
+    """Add a custom spam detection pattern"""
+    user_id = current_user["id"]
+    pattern = request.get("pattern", "").strip()
+    
+    if not pattern:
+        raise HTTPException(status_code=400, detail="Pattern is required")
+    
+    if len(pattern) < 2:
+        raise HTTPException(status_code=400, detail="Pattern too short (min 2 characters)")
+    
+    # Add to user's custom patterns
+    await db.user_spam_patterns.update_one(
+        {"user_id": user_id},
+        {"$addToSet": {"patterns": pattern}},
+        upsert=True
+    )
+    
+    return {"message": f"Pattern '{pattern}' ajouté", "pattern": pattern}
+
+@api_router.delete("/spam-tokens/patterns/{pattern}")
+async def remove_spam_pattern(pattern: str, current_user: dict = Depends(get_current_user)):
+    """Remove a custom spam detection pattern"""
+    user_id = current_user["id"]
+    
+    # Decode URL-encoded pattern
+    from urllib.parse import unquote
+    pattern = unquote(pattern)
+    
+    # Remove from user's custom patterns
+    result = await db.user_spam_patterns.update_one(
+        {"user_id": user_id},
+        {"$pull": {"patterns": pattern}}
+    )
+    
+    if result.modified_count > 0:
+        return {"message": f"Pattern '{pattern}' supprimé"}
+    else:
+        raise HTTPException(status_code=404, detail="Pattern not found")
+
 # ==================== MISSING PRICES RECOVERY ====================
 
 @api_router.get("/transactions/missing-prices")
