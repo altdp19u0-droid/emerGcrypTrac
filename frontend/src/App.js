@@ -5673,6 +5673,124 @@ const ReportsPage = () => {
         </div>
       )}
 
+      {/* Section Résumé Fiscal */}
+      {fiscalSummary && (
+        <div className="mb-6">
+          <h2 className="text-lg font-semibold mb-3 text-zinc-300 flex items-center gap-2">
+            <FileText size={20} className="text-amber-400" />
+            Résumé Fiscal
+            <Badge variant="outline" className="text-xs text-muted-foreground ml-2">Classification des transactions</Badge>
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+            {/* Transactions imposables */}
+            <Card className="bg-gradient-to-br from-red-900/30 to-red-800/10 border-red-500/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-zinc-400 flex items-center gap-2">
+                  <AlertTriangle size={16} className="text-red-400" />
+                  Transactions Imposables
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-red-400">
+                  {fiscalSummary.taxable_transactions?.count || 0}
+                </div>
+                <p className="text-sm text-zinc-500 mt-1">
+                  €{(fiscalSummary.taxable_transactions?.total_value_eur || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+                </p>
+                <p className="text-xs text-red-400/70 mt-2">Ventes crypto → fiat</p>
+              </CardContent>
+            </Card>
+            
+            {/* Non catégorisées */}
+            <Card className="bg-gradient-to-br from-amber-900/30 to-amber-800/10 border-amber-500/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-zinc-400 flex items-center gap-2">
+                  <HelpCircle size={16} className="text-amber-400" />
+                  Non Catégorisées
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-amber-400">
+                  {fiscalSummary.uncategorized_count || 0}
+                </div>
+                <p className="text-xs text-amber-400/70 mt-2">À classifier dans Transactions</p>
+              </CardContent>
+            </Card>
+            
+            {/* Total catégorisées */}
+            <Card className="bg-gradient-to-br from-green-900/30 to-green-800/10 border-green-500/30">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-zinc-400 flex items-center gap-2">
+                  <CheckCircle size={16} className="text-green-400" />
+                  Catégorisées
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-green-400">
+                  {(fiscalSummary.by_fiscal_type || []).filter(f => f.fiscal_type !== "non_catégorisé").reduce((sum, f) => sum + f.count, 0)}
+                </div>
+                <p className="text-xs text-green-400/70 mt-2">Transactions classifiées</p>
+              </CardContent>
+            </Card>
+          </div>
+          
+          {/* Détail par type fiscal */}
+          <Card>
+            <CardContent className="pt-4">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Type Fiscal</TableHead>
+                    <TableHead className="text-right">Nombre</TableHead>
+                    <TableHead className="text-right">Valeur Totale</TableHead>
+                    <TableHead className="text-center">Imposable</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {(fiscalSummary.by_fiscal_type || []).map((item) => {
+                    const fiscalConfig = {
+                      "buy": { label: "🛒 Achat", color: "text-blue-400", taxable: false },
+                      "sell": { label: "💰 Vente", color: "text-red-400", taxable: true },
+                      "capital_deposit": { label: "📥 Dépôt Capital", color: "text-purple-400", taxable: false },
+                      "capital_return": { label: "📤 Remb. Capital", color: "text-amber-400", taxable: false },
+                      "interest": { label: "📈 Intérêt", color: "text-green-400", taxable: false },
+                      "transfer": { label: "↔️ Transfert", color: "text-zinc-400", taxable: false },
+                      "non_catégorisé": { label: "❓ Non catégorisé", color: "text-zinc-500", taxable: false }
+                    };
+                    const config = fiscalConfig[item.fiscal_type] || fiscalConfig["non_catégorisé"];
+                    
+                    return (
+                      <TableRow key={item.fiscal_type} className="text-zinc-100">
+                        <TableCell className={`font-medium ${config.color}`}>
+                          {config.label}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {item.count}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          €{(item.total_value_eur || 0).toLocaleString("fr-FR", { minimumFractionDigits: 2 })}
+                        </TableCell>
+                        <TableCell className="text-center">
+                          {config.taxable ? (
+                            <Badge variant="destructive" className="text-xs">Oui</Badge>
+                          ) : (
+                            <Badge variant="outline" className="text-xs text-zinc-500">Non</Badge>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+              <p className="text-xs text-muted-foreground mt-3 text-center">
+                ⚠️ En France, seules les ventes crypto → EUR sont imposables (plus-value). Les intérêts ne sont imposables que lors de leur conversion en fiat.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
       {/* Section Activité */}
       <div className="mb-6">
         <h2 className="text-lg font-semibold mb-3 text-zinc-300">Activité des Transactions</h2>
