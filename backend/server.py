@@ -5907,6 +5907,189 @@ async def check_eur_rate_distribution(current_user: dict = Depends(get_current_u
         "recommendation": "Run POST /api/transactions/fix-eur-prices to fix transactions with incorrect rates" if fixed_rate_count > 0 else "Rates look correct"
     }
 
+# ==================== FISCAL CATEGORIZATION ====================
+
+FISCAL_TYPES = {
+    "buy": {"label": "Achat", "taxable": False, "description": "Achat de crypto (pas imposable)"},
+    "sell": {"label": "Vente", "taxable": True, "description": "Vente crypto → fiat (plus-value imposable)"},
+    "capital_deposit": {"label": "Dépôt Capital", "taxable": False, "description": "Investissement en capital"},
+    "capital_return": {"label": "Remboursement Capital", "taxable": False, "description": "Retrait de capital investi"},
+    "interest": {"label": "Intérêt", "taxable": False, "description": "Intérêts/Yield (imposable si converti en fiat)"},
+    "transfer": {"label": "Transfert", "taxable": False, "description": "Transfert entre wallets"}
+}
+
+@api_router.get("/transactions/fiscal-types")
+async def get_fiscal_types():
+    """Get available fiscal categorization types"""
+    return {"fiscal_types": FISCAL_TYPES}
+
+@api_router.put("/transactions/{tx_id}/fiscal")
+async def update_transaction_fiscal(
+    tx_id: str, 
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Update fiscal categorization for a transaction.
+    Body: {
+        "fiscal_type": "buy|sell|capital_deposit|capital_return|interest|transfer",
+        "fiscal_taxable": true/false (optional, auto-set based on type)
+    }
+    """
+    user_id = current_user["id"]
+    fiscal_type = request.get("fiscal_type")
+    
+    if fiscal_type and fiscal_type not in FISCAL_TYPES:
+        raise HTTPException(status_code=400, detail=f"Invalid fiscal_type. Must be one of: {list(FISCAL_TYPES.keys())}")
+    
+    # Check transaction exists
+    tx = await db.transactions.find_one({"user_id": user_id, "id": tx_id})
+    if not tx:
+        raise HTTPException(status_code=404, detail="Transaction not found")
+    
+    update_fields = {}
+    
+    if fiscal_type:
+        update_fields["fiscal_type"] = fiscal_type
+        # Auto-set taxable based on type
+        update_fields["fiscal_taxable"] = FISCAL_TYPES[fiscal_type]["taxable"]
+        
+        # Also set income/expense category based on fiscal type
+        if fiscal_type in ["interest"]:
+            update_fields["income_category"] = "yield"
+            update_fields["expense_category"] = None
+        elif fiscal_type in ["capital_return"]:
+            update_fields["income_category"] = "capital_return"
+            update_fields["expense_category"] = None
+        elif fiscal_type in ["capital_deposit"]:
+            update_fields["expense_category"] = "investment"
+            update_fields["income_category"] = None
+        elif fiscal_type in ["buy"]:
+            update_fields["expense_category"] = None
+            update_fields["income_category"] = None
+        elif fiscal_type in ["sell"]:
+            update_fields["expense_category"] = None
+            update_fields["income_category"] = None
+    
+    # Allow explicit override of taxable
+    if "fiscal_taxable" in request:
+        update_fields["fiscal_taxable"] = request["fiscal_taxable"]
+    
+    if not update_fields:
+        return {"message": "Rien à mettre à jour"}
+    
+    await db.transactions.update_one(
+        {"user_id": user_id, "id": tx_id},
+        {"$set": update_fields}
+    )
+    
+    return {
+        "message": f"Transaction mise à jour avec type fiscal: {FISCAL_TYPES.get(fiscal_type, {}).get('label', fiscal_type)}",
+        "fiscal_type": fiscal_type,
+        "fiscal_taxable": update_fields.get("fiscal_taxable", False)
+    }
+
+@api_router.post("/transactions/bulk-fiscal")
+async def bulk_update_fiscal(
+    request: dict,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Bulk update fiscal categorization for multiple transactions.
+    Body: {
+        "transaction_ids": ["id1", "id2", ...],
+        "fiscal_type": "buy|sell|capital_deposit|capital_return|interest|transfer"
+    }
+    """
+    user_id = current_user["id"]
+    tx_ids = request.get("transaction_ids", [])
+    fiscal_type = request.get("fiscal_type")
+    
+    if not tx_ids:
+        raise HTTPException(status_code=400, detail="transaction_ids is required")
+    
+    if fiscal_type and fiscal_type not in FISCAL_TYPES:
+        raise HTTPException(status_code=400, detail=f"Invalid fiscal_type. Must be one of: {list(FISCAL_TYPES.keys())}")
+    
+    update_fields = {
+        "fiscal_type": fiscal_type,
+        "fiscal_taxable": FISCAL_TYPES[fiscal_type]["taxable"] if fiscal_type else False
+    }
+    
+    # Set income/expense category
+    if fiscal_type in ["interest"]:
+        update_fields["income_category"] = "yield"
+    elif fiscal_type in ["capital_return"]:
+        update_fields["income_category"] = "capital_return"
+    elif fiscal_type in ["capital_deposit"]:
+        update_fields["expense_category"] = "investment"
+    
+    result = await db.transactions.update_many(
+        {"user_id": user_id, "id": {"$in": tx_ids}},
+        {"$set": update_fields}
+    )
+    
+    return {
+        "message": f"{result.modified_count} transaction(s) mise(s) à jour",
+        "updated_count": result.modified_count,
+        "fiscal_type": fiscal_type
+    }
+
+@api_router.get("/transactions/fiscal-summary")
+async def get_fiscal_summary(current_user: dict = Depends(get_current_user)):
+    """
+    Get summary of transactions by fiscal category.
+    """
+    user_id = current_user["id"]
+    
+    pipeline = [
+        {"$match": {"user_id": user_id, "$or": [{"is_spam": False}, {"is_spam": {"$exists": False}}]}},
+        {"$group": {
+            "_id": "$fiscal_type",
+            "count": {"$sum": 1},
+            "total_value_eur": {"$sum": {"$abs": "$value_eur"}}
+        }},
+        {"$sort": {"count": -1}}
+    ]
+    
+    results = await db.transactions.aggregate(pipeline).to_list(length=None)
+    
+    # Also count uncategorized
+    uncategorized = await db.transactions.count_documents({
+        "user_id": user_id,
+        "$or": [{"is_spam": False}, {"is_spam": {"$exists": False}}],
+        "$or": [{"fiscal_type": None}, {"fiscal_type": {"$exists": False}}]
+    })
+    
+    # Count taxable transactions
+    taxable_pipeline = [
+        {"$match": {"user_id": user_id, "fiscal_taxable": True}},
+        {"$group": {
+            "_id": None,
+            "count": {"$sum": 1},
+            "total_value_eur": {"$sum": {"$abs": "$value_eur"}}
+        }}
+    ]
+    taxable_results = await db.transactions.aggregate(taxable_pipeline).to_list(length=None)
+    taxable_summary = taxable_results[0] if taxable_results else {"count": 0, "total_value_eur": 0}
+    
+    return {
+        "by_fiscal_type": [
+            {
+                "fiscal_type": r["_id"] or "non_catégorisé",
+                "label": FISCAL_TYPES.get(r["_id"], {}).get("label", "Non catégorisé"),
+                "count": r["count"],
+                "total_value_eur": r["total_value_eur"]
+            }
+            for r in results
+        ],
+        "uncategorized_count": uncategorized,
+        "taxable_transactions": {
+            "count": taxable_summary.get("count", 0),
+            "total_value_eur": taxable_summary.get("total_value_eur", 0)
+        }
+    }
+
 # ==================== EXPORT ENDPOINT ====================
 
 @api_router.get("/export/transactions")
