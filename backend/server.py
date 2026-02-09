@@ -190,6 +190,22 @@ def get_eur_usd_rate_sync(date_str: str) -> float:
     # Default fallback
     return 0.92
 
+def calculate_price_eur(price_usd: float, date_str: str = None, timestamp: int = None) -> tuple:
+    """
+    Calculate EUR price from USD price using historical exchange rate.
+    Returns (price_eur, eur_usd_rate).
+    """
+    if not date_str and timestamp:
+        from datetime import datetime
+        date_str = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d")
+    elif not date_str:
+        from datetime import datetime
+        date_str = datetime.now().strftime("%Y-%m-%d")
+    
+    rate = get_eur_usd_rate_sync(date_str)
+    price_eur = price_usd * rate
+    return price_eur, rate
+
 # Token contract addresses by chain (for DeFiLlama price lookups)
 # Format: "SYMBOL": {"chain": "contract_address"}
 TOKEN_CONTRACTS = {
