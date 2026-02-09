@@ -2398,9 +2398,14 @@ async def scan_and_mark_spam(current_user: dict = Depends(get_current_user)):
     user_id = current_user["id"]
     
     # Get user custom patterns
-    user_patterns = await db.spam_patterns.find_one({"user_id": user_id}, {"_id": 0})
+    user_patterns = await db.user_spam_patterns.find_one({"user_id": user_id}, {"_id": 0})
     custom_patterns = user_patterns.get("patterns", []) if user_patterns else []
     all_patterns = DEFAULT_SPAM_PATTERNS + custom_patterns
+    
+    # Get user whitelist
+    user_whitelist = await db.user_whitelist.find_one({"user_id": user_id})
+    whitelist = set(user_whitelist.get("tokens", [])) if user_whitelist else set()
+    whitelist = whitelist.union(LEGITIMATE_TOKENS)
     
     # Find all transactions not yet marked as spam
     transactions = await db.transactions.find({
@@ -2410,9 +2415,17 @@ async def scan_and_mark_spam(current_user: dict = Depends(get_current_user)):
     
     marked_count = 0
     marked_tokens = set()
+    skipped_whitelist = set()
     
     for tx in transactions:
         asset = tx.get("asset", "")
+        asset_upper = asset.upper()
+        
+        # Check whitelist first
+        if asset_upper in whitelist:
+            skipped_whitelist.add(asset)
+            continue
+            
         if is_spam_token(asset, all_patterns):
             await db.transactions.update_one(
                 {"_id": tx["_id"]},
@@ -2424,7 +2437,8 @@ async def scan_and_mark_spam(current_user: dict = Depends(get_current_user)):
     return {
         "message": f"{marked_count} transactions marquées comme spam",
         "marked_count": marked_count,
-        "unique_tokens_marked": list(marked_tokens)
+        "unique_tokens_marked": list(marked_tokens),
+        "skipped_whitelist": list(skipped_whitelist) if skipped_whitelist else []
     }
 
 @api_router.post("/spam-tokens/mark/{symbol}")
