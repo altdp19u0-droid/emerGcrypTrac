@@ -530,6 +530,21 @@ const Dashboard = () => {
     }
   };
 
+  const handleFixFalsePositives = async () => {
+    try {
+      const response = await api.post("/spam-tokens/fix-false-positives");
+      toast.success(response.data.message);
+      if (response.data.fixed_tokens?.length > 0) {
+        toast.info(`Tokens restaurés: ${response.data.fixed_tokens.map(t => t.symbol).join(', ')}`);
+      }
+      fetchSpamTokens();
+      fetchSpamPreview();
+      fetchData();
+    } catch (error) {
+      toast.error("Erreur lors de la correction");
+    }
+  };
+
   const handleMarkAsSpam = async (symbol) => {
     try {
       await api.post(`/spam-tokens/mark/${encodeURIComponent(symbol)}`);
