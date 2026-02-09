@@ -1210,6 +1210,7 @@ async def sync_wallet_from_etherscan(
     chain_id = chain_info["chain_id"]
     scanner_name = chain_info["name"]
     native_symbol = chain_info.get("native_symbol", "ETH")
+    wallet_name_full = wallet.get("name", f"Wallet {wallet_id[:8]}")  # Get wallet name for transactions
     
     imported_count = 0
     api_type = chain_info.get("api_type", "etherscan")
