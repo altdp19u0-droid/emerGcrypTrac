@@ -3372,6 +3372,7 @@ async def get_transactions(
     assets: Optional[str] = None,  # Comma-separated list for multi-select
     tx_type: Optional[str] = None,
     tx_types: Optional[str] = None,  # Comma-separated list for multi-select
+    fiscal_types: Optional[str] = None,  # Comma-separated list for fiscal classification filter
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     hide_spam: bool = True,
