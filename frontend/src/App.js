@@ -823,6 +823,142 @@ const Dashboard = () => {
                       </div>
                     </div>
                   </TabsContent>
+                  
+                  <TabsContent value="config" className="mt-4">
+                    <div className="space-y-4">
+                      {/* Whitelist personnelle */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-sm font-medium text-blue-400 flex items-center gap-2">
+                            <Shield size={16} />
+                            Whitelist (tokens protégés)
+                          </h4>
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Ces tokens ne seront jamais marqués comme spam automatiquement.
+                        </p>
+                        <div className="flex gap-2 mb-3">
+                          <Input 
+                            placeholder="Ajouter un token (ex: AGEUR)"
+                            id="whitelist-input"
+                            className="h-8 text-sm"
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Enter' && e.target.value.trim()) {
+                                try {
+                                  await api.post(`/spam-tokens/whitelist/${encodeURIComponent(e.target.value.trim())}`);
+                                  toast.success(`${e.target.value.trim()} ajouté à la whitelist`);
+                                  e.target.value = '';
+                                  fetchSpamTokens();
+                                  fetchData();
+                                } catch (error) {
+                                  toast.error("Erreur lors de l'ajout");
+                                }
+                              }
+                            }}
+                          />
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="text-blue-400 border-blue-500/50"
+                            onClick={async () => {
+                              const input = document.getElementById('whitelist-input');
+                              if (input?.value?.trim()) {
+                                try {
+                                  await api.post(`/spam-tokens/whitelist/${encodeURIComponent(input.value.trim())}`);
+                                  toast.success(`${input.value.trim()} ajouté à la whitelist`);
+                                  input.value = '';
+                                  fetchSpamTokens();
+                                  fetchData();
+                                } catch (error) {
+                                  toast.error("Erreur lors de l'ajout");
+                                }
+                              }
+                            }}
+                          >
+                            <Plus size={14} className="mr-1" />
+                            Ajouter
+                          </Button>
+                        </div>
+                        <ScrollArea className="h-[100px] border border-zinc-700 rounded p-2">
+                          <div className="flex flex-wrap gap-1">
+                            {['AGEUR', 'USDC', 'USDT', 'DAI', 'STEUR', 'EURC', 'WETH', 'WBTC', '8LNDS', 'ZCHF', 'AIOZ'].map((token) => (
+                              <Badge key={token} variant="secondary" className="text-xs bg-blue-900/30 text-blue-300">
+                                {token}
+                              </Badge>
+                            ))}
+                            <span className="text-xs text-muted-foreground ml-2">+ 22 autres...</span>
+                          </div>
+                        </ScrollArea>
+                      </div>
+                      
+                      {/* Patterns de détection */}
+                      <div>
+                        <div className="flex items-center justify-between mb-2">
+                          <h4 className="text-sm font-medium text-amber-400 flex items-center gap-2">
+                            <AlertTriangle size={16} />
+                            Patterns de détection
+                          </h4>
+                        </div>
+                        <p className="text-xs text-muted-foreground mb-2">
+                          Les tokens contenant ces patterns seront automatiquement marqués comme spam.
+                        </p>
+                        <div className="flex gap-2 mb-3">
+                          <Input 
+                            placeholder="Ajouter un pattern (ex: .claim)"
+                            id="pattern-input"
+                            className="h-8 text-sm"
+                            onKeyDown={async (e) => {
+                              if (e.key === 'Enter' && e.target.value.trim()) {
+                                try {
+                                  await api.post('/spam-tokens/patterns', { pattern: e.target.value.trim() });
+                                  toast.success(`Pattern "${e.target.value.trim()}" ajouté`);
+                                  e.target.value = '';
+                                  fetchSpamPreview();
+                                } catch (error) {
+                                  toast.error("Erreur lors de l'ajout");
+                                }
+                              }
+                            }}
+                          />
+                          <Button 
+                            size="sm" 
+                            variant="outline"
+                            className="text-amber-400 border-amber-500/50"
+                            onClick={async () => {
+                              const input = document.getElementById('pattern-input');
+                              if (input?.value?.trim()) {
+                                try {
+                                  await api.post('/spam-tokens/patterns', { pattern: input.value.trim() });
+                                  toast.success(`Pattern "${input.value.trim()}" ajouté`);
+                                  input.value = '';
+                                  fetchSpamPreview();
+                                } catch (error) {
+                                  toast.error("Erreur lors de l'ajout");
+                                }
+                              }
+                            }}
+                          >
+                            <Plus size={14} className="mr-1" />
+                            Ajouter
+                          </Button>
+                        </div>
+                        <ScrollArea className="h-[100px] border border-zinc-700 rounded p-2">
+                          <div className="flex flex-wrap gap-1">
+                            {['t.me/', '.claim', '/claim', '-airdrop', '.airdrop', '-reward', 'http://', 'https://', '.xyz/', '.win/'].map((pattern) => (
+                              <Badge key={pattern} variant="secondary" className="text-xs bg-amber-900/30 text-amber-300">
+                                {pattern}
+                              </Badge>
+                            ))}
+                            <span className="text-xs text-muted-foreground ml-2">+ patterns système...</span>
+                          </div>
+                        </ScrollArea>
+                      </div>
+                      
+                      <p className="text-xs text-center text-muted-foreground border-t border-zinc-700 pt-3">
+                        💡 La whitelist a priorité sur les patterns. Un token whitelisté ne sera jamais marqué spam.
+                      </p>
+                    </div>
+                  </TabsContent>
                 </Tabs>
               </div>
             </DialogContent>
