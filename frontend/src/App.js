@@ -1736,7 +1736,8 @@ const TransactionsPage = () => {
   const [filters, setFilters] = useState({ 
     wallet_ids: [], // Multi-select for wallets
     assets: [], // Multi-select for assets  
-    tx_types: [], // Multi-select for types
+    tx_types: [], // Multi-select for operation types
+    fiscal_types: [], // Multi-select for fiscal classification
     start_date: "", 
     end_date: "",
     hide_spam: true, // Hide spam by default
