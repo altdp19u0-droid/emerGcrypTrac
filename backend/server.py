@@ -1326,14 +1326,15 @@ async def sync_wallet_from_etherscan(
                                 except:
                                     tx_date = datetime.now(timezone.utc)
                                 
-                                # Get price
+                                # Get price with historical EUR rate
+                                tx_date_str = tx_date.strftime("%Y-%m-%d")
                                 price_usd = 1.0  # Default for stablecoins
-                                price_eur = price_usd / 1.08
+                                price_eur, eur_rate = calculate_price_eur(price_usd, tx_date_str)
                                 try:
                                     prices = await get_cached_prices([symbol.upper()])
                                     if symbol.upper() in prices:
                                         price_usd = prices[symbol.upper()]["usd"]
-                                        price_eur = prices[symbol.upper()].get("eur", price_usd / 1.08)
+                                        price_eur, eur_rate = calculate_price_eur(price_usd, tx_date_str)
                                 except:
                                     pass
                                 
