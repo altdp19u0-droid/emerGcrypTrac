@@ -2696,7 +2696,7 @@ const TransactionsPage = () => {
               <TableRow>
                 <TableHead>Catégorie</TableHead>
                 <TableHead>Type</TableHead>
-                <TableHead className="text-xs">Libellé</TableHead>
+                <TableHead className="text-xs">Type Fiscal</TableHead>
                 <TableHead>Asset</TableHead>
                 <TableHead>Amount</TableHead>
                 <TableHead>Prix/Débit</TableHead>
