@@ -5382,6 +5382,7 @@ const ReportsPage = () => {
   const [positions, setPositions] = useState([]);
   const [fiatAccounts, setFiatAccounts] = useState([]);
   const [defiPositions, setDefiPositions] = useState({});
+  const [fiscalSummary, setFiscalSummary] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const api = createAuthenticatedApi(accessToken);
@@ -5389,18 +5390,20 @@ const ReportsPage = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [pnlRes, txRes, posRes, fiatRes, defiRes] = await Promise.all([
+        const [pnlRes, txRes, posRes, fiatRes, defiRes, fiscalRes] = await Promise.all([
           api.get("/portfolio/pnl"),
           api.get("/transactions", { params: { page_size: 200, hide_spam: true } }),
           api.get("/positions"),
           api.get("/fiat-accounts"),
-          api.get("/defi/positions")
+          api.get("/defi/positions"),
+          api.get("/transactions/fiscal-summary")
         ]);
         setPnlData(pnlRes.data);
         setTransactions(txRes.data.transactions || []);
         setPositions(posRes.data.positions || []);
         setFiatAccounts(fiatRes.data || []);
         setDefiPositions(defiRes.data.positions || {});
+        setFiscalSummary(fiscalRes.data);
       } catch (error) {
         console.error("Error:", error);
       } finally {
