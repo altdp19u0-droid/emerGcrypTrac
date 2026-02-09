@@ -5746,6 +5746,141 @@ async def link_transactions_to_position(request: dict, current_user: dict = Depe
         "updated_count": result.modified_count
     }
 
+# ==================== FIX EUR PRICES WITH HISTORICAL RATES ====================
+
+@api_router.post("/transactions/fix-eur-prices")
+async def fix_eur_prices_with_historical_rates(current_user: dict = Depends(get_current_user)):
+    """
+    Recalculate price_eur and value_eur for all transactions using historical EUR/USD rates.
+    This fixes the issue where all transactions use 0.92 as the EUR/USD rate.
+    """
+    user_id = current_user["id"]
+    
+    # Get all transactions with price_usd
+    transactions = await db.transactions.find({
+        "user_id": user_id,
+        "price_usd": {"$exists": True, "$gt": 0}
+    }).to_list(length=None)
+    
+    if not transactions:
+        return {"message": "Aucune transaction à corriger", "updated": 0}
+    
+    # Group transactions by date to minimize API calls
+    dates_needed = set()
+    for tx in transactions:
+        date_str = tx.get("date", "")[:10]  # Get YYYY-MM-DD
+        if date_str:
+            dates_needed.add(date_str)
+    
+    # Fetch all needed rates
+    logger.info(f"Fetching EUR/USD rates for {len(dates_needed)} unique dates...")
+    rates_by_date = {}
+    for date_str in dates_needed:
+        rate = await get_eur_usd_rate(date_str)
+        rates_by_date[date_str] = rate
+    
+    # Update each transaction
+    updated_count = 0
+    errors = []
+    
+    for tx in transactions:
+        try:
+            date_str = tx.get("date", "")[:10]
+            if not date_str or date_str not in rates_by_date:
+                continue
+            
+            rate = rates_by_date[date_str]
+            price_usd = tx.get("price_usd", 0)
+            amount = abs(tx.get("amount", 0))
+            
+            # Calculate new EUR values
+            new_price_eur = price_usd * rate
+            new_value_eur = amount * new_price_eur
+            
+            # Skip if price is already locked
+            if tx.get("price_locked"):
+                continue
+            
+            # Update transaction
+            await db.transactions.update_one(
+                {"_id": tx["_id"]},
+                {"$set": {
+                    "price_eur": new_price_eur,
+                    "value_eur": new_value_eur,
+                    "eur_usd_rate": rate,
+                    "eur_price_source": "historical_rate"
+                }}
+            )
+            updated_count += 1
+            
+        except Exception as e:
+            errors.append(f"Error updating tx {tx.get('id')}: {str(e)}")
+    
+    return {
+        "message": f"{updated_count} transaction(s) mise(s) à jour avec les taux EUR/USD historiques",
+        "updated": updated_count,
+        "dates_processed": len(dates_needed),
+        "rates_sample": dict(list(rates_by_date.items())[:5]),
+        "errors": errors[:10] if errors else []
+    }
+
+@api_router.get("/transactions/eur-rate-check")
+async def check_eur_rate_distribution(current_user: dict = Depends(get_current_user)):
+    """
+    Check the distribution of EUR/USD rates used in transactions.
+    Helps identify transactions with incorrect rates.
+    """
+    user_id = current_user["id"]
+    
+    pipeline = [
+        {"$match": {"user_id": user_id, "price_usd": {"$gt": 0}, "price_eur": {"$gt": 0}}},
+        {"$project": {
+            "date": {"$substr": ["$date", 0, 10]},
+            "asset": "$asset",
+            "price_usd": 1,
+            "price_eur": 1,
+            "eur_usd_rate": {"$cond": [
+                {"$gt": ["$eur_usd_rate", 0]},
+                "$eur_usd_rate",
+                {"$divide": ["$price_eur", "$price_usd"]}
+            ]}
+        }},
+        {"$group": {
+            "_id": "$eur_usd_rate",
+            "count": {"$sum": 1},
+            "sample_dates": {"$addToSet": "$date"}
+        }},
+        {"$sort": {"count": -1}},
+        {"$limit": 20}
+    ]
+    
+    results = await db.transactions.aggregate(pipeline).to_list(length=None)
+    
+    # Count transactions with likely incorrect rate (exactly 0.92)
+    fixed_rate_count = await db.transactions.count_documents({
+        "user_id": user_id,
+        "price_usd": {"$gt": 0},
+        "$expr": {
+            "$and": [
+                {"$gt": ["$price_eur", 0]},
+                {"$eq": [{"$round": [{"$divide": ["$price_eur", "$price_usd"]}, 2]}, 0.92]}
+            ]
+        }
+    })
+    
+    return {
+        "rate_distribution": [
+            {
+                "rate": round(r["_id"], 4) if r["_id"] else None,
+                "count": r["count"],
+                "sample_dates": list(r.get("sample_dates", []))[:3]
+            }
+            for r in results
+        ],
+        "transactions_with_fixed_092_rate": fixed_rate_count,
+        "recommendation": "Run POST /api/transactions/fix-eur-prices to fix transactions with incorrect rates" if fixed_rate_count > 0 else "Rates look correct"
+    }
+
 # ==================== EXPORT ENDPOINT ====================
 
 @api_router.get("/export/transactions")
