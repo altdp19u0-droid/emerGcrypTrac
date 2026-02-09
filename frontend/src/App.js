@@ -1837,6 +1837,7 @@ const TransactionsPage = () => {
         ...(filters.wallet_ids.length > 0 && { wallet_ids: filters.wallet_ids.join(",") }),
         ...(filters.assets.length > 0 && { assets: filters.assets.join(",") }),
         ...(filters.tx_types.length > 0 && { tx_types: filters.tx_types.join(",") }),
+        ...(filters.fiscal_types.length > 0 && { fiscal_types: filters.fiscal_types.join(",") }),
         ...(filters.start_date && { start_date: filters.start_date }),
         ...(filters.end_date && { end_date: filters.end_date }),
         hide_spam: filters.hide_spam,
