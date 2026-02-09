@@ -2183,6 +2183,22 @@ const TransactionsPage = () => {
             Double-Entry
           </Button>
           
+          {/* Fix EUR Rates Button */}
+          <Button 
+            variant="outline" 
+            onClick={handleFixEurRates} 
+            disabled={fixingEurRates}
+            data-testid="fix-eur-rates-btn" 
+            title="Recalculer les prix EUR avec les taux de change historiques réels"
+          >
+            {fixingEurRates ? (
+              <RefreshCw size={16} className="mr-2 animate-spin" />
+            ) : (
+              <DollarSign size={16} className="mr-2" />
+            )}
+            Corriger Taux EUR
+          </Button>
+          
           {/* Missing Prices Button & Dialog */}
           <Dialog open={pricesDialogOpen} onOpenChange={setPricesDialogOpen}>
             <DialogTrigger asChild>
