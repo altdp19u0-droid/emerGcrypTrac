@@ -2506,6 +2506,84 @@ async def preview_spam_detection(current_user: dict = Depends(get_current_user))
         "safe_count": len(safe_tokens)
     }
 
+@api_router.post("/spam-tokens/fix-false-positives")
+async def fix_spam_false_positives(current_user: dict = Depends(get_current_user)):
+    """
+    Fix false positives: unmark legitimate tokens that were incorrectly marked as spam.
+    Uses the whitelist of known legitimate tokens.
+    """
+    user_id = current_user["id"]
+    
+    # Find transactions marked as spam but with legitimate token symbols
+    legitimate_upper = [t.upper() for t in LEGITIMATE_TOKENS]
+    
+    # Unmark legitimate tokens
+    result = await db.transactions.update_many(
+        {
+            "user_id": user_id,
+            "is_spam": True,
+            "asset": {"$in": list(LEGITIMATE_TOKENS) + [t.lower() for t in LEGITIMATE_TOKENS]}
+        },
+        {"$set": {"is_spam": False}}
+    )
+    
+    # Also check case-insensitively
+    pipeline = [
+        {"$match": {"user_id": user_id, "is_spam": True}},
+        {"$group": {"_id": "$asset", "count": {"$sum": 1}}}
+    ]
+    spam_tokens = await db.transactions.aggregate(pipeline).to_list(1000)
+    
+    fixed_tokens = []
+    for t in spam_tokens:
+        if t["_id"].upper() in LEGITIMATE_TOKENS:
+            await db.transactions.update_many(
+                {"user_id": user_id, "asset": t["_id"], "is_spam": True},
+                {"$set": {"is_spam": False}}
+            )
+            fixed_tokens.append({"symbol": t["_id"], "count": t["count"]})
+    
+    return {
+        "message": f"{len(fixed_tokens)} token(s) légitime(s) retirés du spam",
+        "fixed_tokens": fixed_tokens,
+        "whitelist_used": list(LEGITIMATE_TOKENS)[:20]
+    }
+
+@api_router.get("/spam-tokens/whitelist")
+async def get_spam_whitelist():
+    """Get the list of whitelisted (legitimate) tokens that are never marked as spam"""
+    return {
+        "whitelist": sorted(list(LEGITIMATE_TOKENS)),
+        "count": len(LEGITIMATE_TOKENS)
+    }
+
+@api_router.post("/spam-tokens/whitelist/{symbol}")
+async def add_to_whitelist(symbol: str, current_user: dict = Depends(get_current_user)):
+    """Add a token to the user's personal whitelist and unmark it from spam"""
+    user_id = current_user["id"]
+    symbol_upper = symbol.upper()
+    
+    # Add to global whitelist (in memory for this session)
+    LEGITIMATE_TOKENS.add(symbol_upper)
+    
+    # Also store in user's database for persistence
+    await db.user_whitelist.update_one(
+        {"user_id": user_id},
+        {"$addToSet": {"tokens": symbol_upper}},
+        upsert=True
+    )
+    
+    # Unmark all transactions of this token from spam
+    result = await db.transactions.update_many(
+        {"user_id": user_id, "asset": {"$regex": f"^{symbol}$", "$options": "i"}, "is_spam": True},
+        {"$set": {"is_spam": False}}
+    )
+    
+    return {
+        "message": f"Token {symbol_upper} ajouté à la whitelist",
+        "transactions_unmarked": result.modified_count
+    }
+
 # ==================== MISSING PRICES RECOVERY ====================
 
 @api_router.get("/transactions/missing-prices")
