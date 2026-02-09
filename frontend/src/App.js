@@ -712,6 +712,9 @@ const Dashboard = () => {
                     <TabsTrigger value="preview" className="flex-1 data-[state=active]:bg-zinc-700">
                       Prévisualisation
                     </TabsTrigger>
+                    <TabsTrigger value="config" className="flex-1 data-[state=active]:bg-zinc-700">
+                      Configuration
+                    </TabsTrigger>
                   </TabsList>
                   
                   <TabsContent value="spam" className="mt-4">
@@ -726,15 +729,35 @@ const Dashboard = () => {
                                   {token.transaction_count} transaction(s)
                                 </span>
                               </div>
-                              <Button 
-                                variant="ghost" 
-                                size="sm" 
-                                onClick={() => handleUnmarkSpam(token.symbol)}
-                                className="text-green-400 hover:text-green-300 hover:bg-green-500/10 ml-2"
-                                title="Retirer du spam"
-                              >
-                                <Check size={14} />
-                              </Button>
+                              <div className="flex gap-1">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={async () => {
+                                    try {
+                                      await api.post(`/spam-tokens/whitelist/${encodeURIComponent(token.symbol)}`);
+                                      toast.success(`${token.symbol} ajouté à la whitelist`);
+                                      fetchSpamTokens();
+                                      fetchData();
+                                    } catch (error) {
+                                      toast.error("Erreur");
+                                    }
+                                  }}
+                                  className="text-blue-400 hover:text-blue-300 hover:bg-blue-500/10"
+                                  title="Ajouter à la whitelist (ne sera plus jamais marqué spam)"
+                                >
+                                  <Shield size={14} />
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  onClick={() => handleUnmarkSpam(token.symbol)}
+                                  className="text-green-400 hover:text-green-300 hover:bg-green-500/10"
+                                  title="Retirer du spam"
+                                >
+                                  <Check size={14} />
+                                </Button>
+                              </div>
                             </div>
                           ))}
                         </div>
