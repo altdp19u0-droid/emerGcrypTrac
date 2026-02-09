@@ -602,7 +602,12 @@ class Transaction(BaseModel):
     linked_movement_id: Optional[str] = None  # Lien vers mouvement de position
     linked_tx_id: Optional[str] = None  # Lien vers transaction crypto contrepartie
     # Catégorie de revenu/dépense pour classification fiscale
-    income_category: Optional[str] = None  # interest, yield, airdrop, reward, cashback, fee, gas, subscription, payment
+    income_category: Optional[str] = None  # interest, yield, capital_return
+    expense_category: Optional[str] = None  # investment, capital_deposit
+    # Classification fiscale française
+    fiscal_type: Optional[str] = None  # buy, sell, capital_deposit, capital_return, interest, transfer
+    fiscal_taxable: bool = False  # True si implique calcul plus-value (vente crypto->fiat)
+    eur_usd_rate: Optional[float] = None  # Taux EUR/USD utilisé pour cette transaction
     created_at: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 class TransactionUpdate(BaseModel):
@@ -618,7 +623,10 @@ class TransactionUpdate(BaseModel):
     fees_currency: Optional[str] = None
     date: Optional[str] = None
     counterparty_wallet: Optional[str] = None
-    income_category: Optional[str] = None  # Catégorie de revenu/dépense
+    income_category: Optional[str] = None  # interest, yield, capital_return
+    expense_category: Optional[str] = None  # investment, capital_deposit
+    fiscal_type: Optional[str] = None  # Classification fiscale
+    fiscal_taxable: Optional[bool] = None  # Implique calcul plus-value
 
 # ==================== ADDRESS CLASSIFICATION ====================
 
