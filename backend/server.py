@@ -2477,9 +2477,14 @@ async def preview_spam_detection(current_user: dict = Depends(get_current_user))
     user_id = current_user["id"]
     
     # Get user custom patterns
-    user_patterns = await db.spam_patterns.find_one({"user_id": user_id}, {"_id": 0})
+    user_patterns = await db.user_spam_patterns.find_one({"user_id": user_id}, {"_id": 0})
     custom_patterns = user_patterns.get("patterns", []) if user_patterns else []
     all_patterns = DEFAULT_SPAM_PATTERNS + custom_patterns
+    
+    # Get user whitelist
+    user_whitelist = await db.user_whitelist.find_one({"user_id": user_id})
+    whitelist = set(user_whitelist.get("tokens", [])) if user_whitelist else set()
+    whitelist = whitelist.union(LEGITIMATE_TOKENS)
     
     # Get all unique tokens
     pipeline = [
@@ -2495,18 +2500,26 @@ async def preview_spam_detection(current_user: dict = Depends(get_current_user))
     
     would_be_spam = []
     safe_tokens = []
+    whitelisted_tokens = []
     
     for t in tokens:
+        asset = t["_id"] or ""
+        asset_upper = asset.upper()
+        
         token_info = {
-            "symbol": t["_id"],
+            "symbol": asset,
             "transaction_count": t["count"],
             "currently_marked_spam": t.get("is_currently_spam", False)
         }
         
-        if is_spam_token(t["_id"], all_patterns):
+        # Check whitelist first
+        if asset_upper in whitelist:
+            token_info["whitelisted"] = True
+            whitelisted_tokens.append(token_info)
+        elif is_spam_token(asset, all_patterns):
             # Find which pattern matched
             for pattern in all_patterns:
-                if pattern.lower() in t["_id"].lower():
+                if pattern.lower() in asset.lower():
                     token_info["matched_pattern"] = pattern
                     break
             would_be_spam.append(token_info)
@@ -2516,8 +2529,10 @@ async def preview_spam_detection(current_user: dict = Depends(get_current_user))
     return {
         "would_be_marked_spam": would_be_spam,
         "safe_tokens": safe_tokens,
+        "whitelisted_tokens": whitelisted_tokens,
         "spam_count": len(would_be_spam),
-        "safe_count": len(safe_tokens)
+        "safe_count": len(safe_tokens),
+        "whitelist_count": len(whitelisted_tokens)
     }
 
 @api_router.post("/spam-tokens/fix-false-positives")
