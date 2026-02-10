@@ -2691,7 +2691,36 @@ const TransactionsPage = () => {
 
       <Card className="filters-card mb-6">
         <CardContent className="pt-4">
-          {/* Address Comparison Section - AU DESSUS des filtres */}
+          {/* Address Filter Section - Filtrer par adresse contrepartie */}
+          <div className="address-filter-section flex items-center gap-3 mb-4 pb-4 border-b border-zinc-700">
+            <span className="text-sm text-muted-foreground whitespace-nowrap">Filtrer par adresse :</span>
+            <Input 
+              type="text" 
+              placeholder="Coller une adresse blockchain pour filtrer les transactions avec cette contrepartie" 
+              value={filters.counterparty_address || ""}
+              onChange={(e) => setFilters(prev => ({...prev, counterparty_address: e.target.value.trim()}))}
+              className="font-mono text-xs flex-1"
+              style={{ minWidth: '400px' }}
+            />
+            {filters.counterparty_address && (
+              <div className="flex items-center gap-2">
+                <Badge variant="secondary" className="bg-blue-900/30 text-blue-300">
+                  {transactions.length} résultat(s)
+                </Badge>
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => setFilters(prev => ({...prev, counterparty_address: ""}))}
+                  className="text-zinc-400 hover:text-zinc-200"
+                >
+                  <Trash2 size={14} className="mr-1" />
+                  Effacer
+                </Button>
+              </div>
+            )}
+          </div>
+          
+          {/* Address Comparison Section - Comparer deux adresses */}
           <div className="address-compare-section flex items-center gap-3 mb-4 pb-4 border-b border-zinc-700">
             <span className="text-sm text-muted-foreground whitespace-nowrap">Comparer :</span>
             <Input 
