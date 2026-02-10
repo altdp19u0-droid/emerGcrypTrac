@@ -1738,6 +1738,7 @@ const TransactionsPage = () => {
     assets: [], // Multi-select for assets  
     tx_types: [], // Multi-select for operation types
     fiscal_types: [], // Multi-select for fiscal classification
+    counterparty_address: "", // Filter by counterparty blockchain address
     start_date: "", 
     end_date: "",
     hide_spam: true, // Hide spam by default
