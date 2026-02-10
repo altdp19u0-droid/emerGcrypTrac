@@ -3373,6 +3373,7 @@ async def get_transactions(
     tx_type: Optional[str] = None,
     tx_types: Optional[str] = None,  # Comma-separated list for multi-select
     fiscal_types: Optional[str] = None,  # Comma-separated list for fiscal classification filter
+    counterparty_address: Optional[str] = None,  # Filter by counterparty blockchain address
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     hide_spam: bool = True,
