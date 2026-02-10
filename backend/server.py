@@ -3425,6 +3425,13 @@ async def get_transactions(
             if fiscal_conditions:
                 query["$or"] = fiscal_conditions
     
+    # Filter by counterparty address (case-insensitive)
+    if counterparty_address:
+        counterparty_address = counterparty_address.strip()
+        if counterparty_address:
+            # Search in counterparty_wallet field (case-insensitive)
+            query["counterparty_wallet"] = {"$regex": f"^{counterparty_address}$", "$options": "i"}
+    
     if start_date:
         query["date"] = {"$gte": start_date}
     if end_date:
